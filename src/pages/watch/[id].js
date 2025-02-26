@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
+import Image from 'next/image'
+import Link from 'next/link'
 import { useAuth } from '../../hooks/useAuth'
 import Layout from '../../components/Layout'
 import VideoPlayer from '../../components/VideoPlayer'
+import FavoriteButton from '../../components/FavoriteButton'
 import { getMediaDetails } from '../../lib/mediaStorage'
 import { supabase } from '../../lib/supabase'
 
@@ -14,6 +17,7 @@ export default function WatchPage() {
   const [progress, setProgress] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [relatedMedia, setRelatedMedia] = useState([])
 
   useEffect(() => {
     const fetchMedia = async () => {
@@ -33,6 +37,18 @@ export default function WatchPage() {
         
         setMedia(mediaData)
         setProgress(progressData?.progress || 0)
+        
+        // Buscar mídia relacionada (mesma categoria)
+        if (mediaData.category) {
+          const { data: relatedData } = await supabase
+            .from('media')
+            .select('*')
+            .eq('category', mediaData.category)
+            .neq('id', id)
+            .limit(4)
+            
+          setRelatedMedia(relatedData || [])
+        }
       } catch (err) {
         console.error('Erro ao buscar detalhes:', err)
         setError('Não foi possível carregar este vídeo')
@@ -71,7 +87,7 @@ export default function WatchPage() {
   }
 
   return (
-    <Layout>
+    <Layout title={media.title}>
       <div className="watch-container">
         <h1>{media.title}</h1>
         
@@ -83,12 +99,51 @@ export default function WatchPage() {
           />
         </div>
         
-        {media.description && (
-          <div className="media-description">
-            <h3>Descrição</h3>
-            <p>{media.description}</p>
+        <div className="media-details">
+          <div className="media-actions">
+            <FavoriteButton mediaId={media.id} />
+            
+            <Link href={`/browse?category=${encodeURIComponent(media.category)}`}>
+              <span className="category-tag">{media.category}</span>
+            </Link>
           </div>
-        )}
+          
+          {media.description && (
+            <div className="media-description">
+              <h3>Descrição</h3>
+              <p>{media.description}</p>
+            </div>
+          )}
+          
+          {relatedMedia.length > 0 && (
+            <div className="related-media">
+              <h3>Conteúdo relacionado</h3>
+              <div className="related-grid">
+                {relatedMedia.map(item => (
+                  <Link href={`/watch/${item.id}`} key={item.id}>
+                    <div className="related-item">
+                      <div className="related-thumbnail">
+                        {item.thumbnail_url ? (
+                          <Image 
+                            src={item.thumbnail_url} 
+                            alt={item.title} 
+                            width={120} 
+                            height={68}
+                          />
+                        ) : (
+                          <div className="no-thumbnail small">
+                            <span>{item.title}</span>
+                          </div>
+                        )}
+                      </div>
+                      <span className="related-title">{item.title}</span>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   )
