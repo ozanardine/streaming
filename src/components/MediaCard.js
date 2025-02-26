@@ -1,33 +1,25 @@
 import React from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
+import SafeImage from './SafeImage'
 
 const MediaCard = ({ media }) => {
-  const progress = media.watch_progress / media.duration * 100 || 0
+  const progress = media.watch_progress && media.duration 
+    ? (media.watch_progress / media.duration * 100) || 0 
+    : 0
   const hasProgress = media.watch_progress && media.watch_progress > 0 && progress < 95
   
   return (
     <Link href={`/watch/${media.id}`}>
       <div className="media-card group h-full">
         <div className="aspect-video relative rounded-md overflow-hidden bg-background-dark">
-          {media.thumbnail_url ? (
-            <Image 
-              src={media.thumbnail_url} 
-              alt={media.title} 
-              fill
-              unoptimized={true} // Adicione esta propriedade
-              sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
-              className="object-cover"
-              onError={(e) => {
-                // Fallback para quando a imagem falhar
-                e.target.src = '/images/default-avatar.png'
-              }}
-            />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center p-4 text-sm text-center text-text-secondary">
-              <span>{media.title}</span>
-            </div>
-          )}
+          <SafeImage 
+            src={media.thumbnail_url} 
+            alt={media.title} 
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
+            className="object-cover"
+            placeholderClassName="bg-background-dark"
+          />
           
           {/* Hover overlay */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">

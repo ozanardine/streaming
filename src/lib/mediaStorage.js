@@ -3,17 +3,13 @@ import { v4 as uuidv4 } from 'uuid'
 
 // Opção 1: Usando o storage gratuito do Supabase (limite de 1GB no plano gratuito)
 export const uploadToSupabase = async (file, folder = 'videos') => {
-  const fileExt = file.name.split('.').pop()
-  const fileName = `${uuidv4()}.${fileExt}`
-  const filePath = `${folder}/${fileName}`
-
-  const { error } = await supabase.storage
-    .from('media')
-    .upload(filePath, file)
+  if (!file) {
+    throw new Error('Nenhum arquivo fornecido')
+  }
 
   // Validar tipo de arquivo para thumbnails
-  if (folder === 'thumbnails') {
-    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+  if (folder.includes('thumbnail')) {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg']
     if (!validTypes.includes(file.type)) {
       throw new Error('Formato de arquivo inválido. Use JPEG, PNG, WebP ou GIF.')
     }
@@ -23,15 +19,36 @@ export const uploadToSupabase = async (file, folder = 'videos') => {
     }
   }
 
-  if (error) {
-    throw error
-  }
+  const fileExt = file.name.split('.').pop()
+  const fileName = `${uuidv4()}.${fileExt}`
+  const filePath = `${folder}/${fileName}`
 
-  const { data } = supabase.storage.from('media').getPublicUrl(filePath)
-  
-  return {
-    url: data.publicUrl,
-    path: filePath
+  try {
+    const { error } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+
+    if (error) throw error
+
+    // Obter URL pública
+    const { data } = supabase.storage.from('media').getPublicUrl(filePath)
+    
+    if (!data || !data.publicUrl) {
+      throw new Error('Erro ao gerar URL pública')
+    }
+    
+    console.log('Upload de arquivo concluído:', data.publicUrl)
+    
+    return {
+      url: data.publicUrl,
+      path: filePath
+    }
+  } catch (error) {
+    console.error('Erro no upload:', error)
+    throw error
   }
 }
 

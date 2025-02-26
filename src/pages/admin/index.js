@@ -208,20 +208,12 @@ export default function AdminDashboard() {
                     {media.map(item => (
                       <tr key={item.id}>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="w-16 h-9 relative rounded overflow-hidden bg-background">
-                            {item.thumbnail_url ? (
-                              <Image 
-                                src={item.thumbnail_url} 
-                                alt={item.title} 
-                                fill
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="flex items-center justify-center h-full text-text-secondary text-xs">
-                                Sem imagem
-                              </div>
-                            )}
-                          </div>
+                          <AdminThumbnail
+                            src={item.thumbnail_url}
+                            alt={item.title}
+                            width={64}
+                            height={36}
+                          />
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium">{item.title}</div>

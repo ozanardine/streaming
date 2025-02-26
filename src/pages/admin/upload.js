@@ -28,6 +28,21 @@ export default function UploadPage() {
     }
   }, [user, isAdmin, router])
 
+  const [thumbnailPreview, setThumbnailPreview] = useState(null)
+
+    const handleThumbnailChange = (e) => {
+      const file = e.target.files[0]
+      if (file) {
+        setThumbnailFile(file)
+        // Criar preview
+        const reader = new FileReader()
+        reader.onload = () => {
+          setThumbnailPreview(reader.result)
+        }
+        reader.readAsDataURL(file)
+      }
+    }
+
   // Função para fazer upload de um arquivo para o Supabase Storage
   const uploadFile = async (file, folder = 'videos') => {
     const fileExt = file.name.split('.').pop()
@@ -270,7 +285,7 @@ export default function UploadPage() {
                 id="thumbnailFile"
                 type="file"
                 accept="image/*"
-                onChange={(e) => setThumbnailFile(e.target.files[0])}
+                onChange={handleThumbnailChange}
                 className="block w-full text-sm text-text-secondary
                   file:mr-4 file:py-2 file:px-4
                   file:rounded-md file:border-0
@@ -279,6 +294,19 @@ export default function UploadPage() {
                   hover:file:bg-primary-dark
                   cursor-pointer"
               />
+              
+              {thumbnailPreview && (
+                <div className="mt-2">
+                  <p className="text-sm text-text-secondary mb-1">Preview:</p>
+                  <div className="w-48 h-27 relative rounded overflow-hidden">
+                    <img 
+                      src={thumbnailPreview}
+                      alt="Thumbnail preview"
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
             
             {loading && (

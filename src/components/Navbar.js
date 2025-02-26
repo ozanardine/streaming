@@ -139,11 +139,12 @@ const Navbar = () => {
                 onClick={() => setShowMenu(!showMenu)}
               >
                 <div className="w-8 h-8 relative overflow-hidden rounded-md">
-                  <Image 
-                    src={profile?.avatar_url || '/images/default-avatar.png'} 
+                  <SafeImage 
+                    src={profile?.avatar_url} 
                     alt={profile?.name || 'Perfil'} 
                     fill
                     className="object-cover"
+                    placeholderClassName="bg-background"
                   />
                 </div>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">

@@ -162,15 +162,13 @@ const ProfileSettings = ({ profileId, isNew = false }) => {
         <div className="flex flex-col md:flex-row gap-6 items-center md:items-start">
           <div className="flex flex-col items-center space-y-4">
             <div className="w-32 h-32 relative overflow-hidden rounded-lg border-4 border-background">
-              <Image 
+              <SafeImage 
                 src={avatarUrl} 
                 alt="Avatar do perfil" 
                 width={128} 
                 height={128}
                 className="object-cover w-full h-full"
-                onError={(e) => {
-                  e.target.src = '/images/default-avatar.png'
-                }}
+                placeholderClassName="bg-background-dark"
               />
             </div>
             <button 
@@ -194,16 +192,13 @@ const ProfileSettings = ({ profileId, isNew = false }) => {
                       onClick={() => selectAvatar(avatar)}
                     >
                       <div className="relative w-full h-full bg-background-dark">
-                        <Image 
+                        <SafeImage 
                           src={avatar}
                           alt={`Avatar ${index + 1}`}
                           width={80}
                           height={80}
                           className="object-cover w-full h-full"
-                          onError={(e) => {
-                            console.log(`Erro ao carregar avatar: ${avatar}`)
-                            e.target.src = '/images/default-avatar.png'
-                          }}
+                          placeholderClassName="bg-background-dark"
                         />
                       </div>
                     </button>

@@ -269,22 +269,48 @@ export const getEpisodesProgress = async (profileId, seriesId) => {
 
 // Função para fazer upload de imagem (thumbnail ou banner)
 export const uploadSeriesImage = async (file, folder = 'series') => {
+  if (!file) {
+    throw new Error('Nenhum arquivo fornecido')
+  }
+
+  // Validar tipo de arquivo para imagens
+  const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/jpg']
+  if (!validTypes.includes(file.type)) {
+    throw new Error('Formato de arquivo inválido. Use JPEG, PNG, WebP ou GIF.')
+  }
+  
+  if (file.size > 5 * 1024 * 1024) { // 5MB 
+    throw new Error('Arquivo muito grande. O tamanho máximo é 5MB.')
+  }
+
   const fileExt = file.name.split('.').pop()
   const fileName = `${uuidv4()}.${fileExt}`
   const filePath = `${folder}/${fileName}`
 
-  const { error } = await supabase.storage
-    .from('media')
-    .upload(filePath, file)
+  try {
+    const { error } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
 
-  if (error) {
+    if (error) throw error
+
+    const { data } = supabase.storage.from('media').getPublicUrl(filePath)
+    
+    if (!data || !data.publicUrl) {
+      throw new Error('Erro ao gerar URL pública')
+    }
+    
+    console.log('Upload de imagem de série concluído:', data.publicUrl)
+    
+    return {
+      url: data.publicUrl,
+      path: filePath
+    }
+  } catch (error) {
+    console.error('Erro no upload de imagem de série:', error)
     throw error
-  }
-
-  const { data } = supabase.storage.from('media').getPublicUrl(filePath)
-  
-  return {
-    url: data.publicUrl,
-    path: filePath
   }
 }
