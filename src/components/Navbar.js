@@ -4,7 +4,6 @@ import Image from 'next/image'
 import { useRouter } from 'next/router'
 import { useAuth } from '../hooks/useAuth'
 import { useProfiles } from '../hooks/useProfiles'
-import SafeImage from './SafeImage'
 
 const Navbar = () => {
   const { user, profile, logout, setCurrentProfile, isAdmin } = useAuth()
@@ -42,6 +41,9 @@ const Navbar = () => {
     setShowMenu(false)
   }
 
+  const defaultLogoSrc = "/images/logo.png";
+  const defaultAvatarSrc = "/images/default-avatar.png";
+
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -50,11 +52,12 @@ const Navbar = () => {
             <Link href="/browse" className="flex-shrink-0">
               <div className="w-24 h-8 relative">
                 <Image 
-                  src="/images/logo.png" 
+                  src={defaultLogoSrc} 
                   alt="Zanflix" 
                   fill
                   className="object-contain"
                   priority
+                  unoptimized
                 />
               </div>
             </Link>
@@ -139,14 +142,24 @@ const Navbar = () => {
                 className="flex items-center space-x-2 focus:outline-none"
                 onClick={() => setShowMenu(!showMenu)}
               >
-                <div className="w-8 h-8 relative overflow-hidden rounded-md">
-                  <SafeImage 
-                    src={profile?.avatar_url} 
-                    alt={profile?.name || 'Perfil'} 
-                    fill
-                    className="object-cover"
-                    placeholderClassName="bg-background"
-                  />
+                <div className="w-8 h-8 relative overflow-hidden rounded-md bg-background-dark">
+                  {profile?.avatar_url ? (
+                    <Image 
+                      src={profile.avatar_url} 
+                      alt={profile?.name || 'Perfil'} 
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <Image 
+                      src={defaultAvatarSrc} 
+                      alt="Perfil" 
+                      fill
+                      className="object-cover"
+                      unoptimized
+                    />
+                  )}
                 </div>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-white" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
@@ -162,12 +175,13 @@ const Navbar = () => {
                         className={`flex items-center w-full px-4 py-2 text-sm text-white ${p.id === profile?.id ? 'bg-primary/20' : 'hover:bg-background-dark'}`}
                         onClick={() => handleProfileSwitch(p)}
                       >
-                        <div className="w-6 h-6 relative overflow-hidden rounded mr-3">
+                        <div className="w-6 h-6 relative overflow-hidden rounded mr-3 bg-background-dark">
                           <Image 
-                            src={p.avatar_url || '/images/default-avatar.png'} 
-                            alt={p.name} 
+                            src={p.avatar_url || defaultAvatarSrc} 
+                            alt={p.name || 'Profile'} 
                             fill
                             className="object-cover"
+                            unoptimized
                           />
                         </div>
                         <span>{p.name}</span>

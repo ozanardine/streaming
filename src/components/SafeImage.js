@@ -9,18 +9,24 @@ const SafeImage = ({
   loading = 'lazy',
   ...props 
 }) => {
-  const [imgSrc, setImgSrc] = useState(null)
+  const [imgSrc, setImgSrc] = useState(fallbackSrc)
   const [imgError, setImgError] = useState(!src)
   const [isLoading, setIsLoading] = useState(true)
   
   useEffect(() => {
-    setImgSrc(src || fallbackSrc)
-    setImgError(!src)
+    // Only update source if it's a valid string
+    if (typeof src === 'string' && src.trim() !== '') {
+      setImgSrc(src)
+      setImgError(false)
+    } else {
+      setImgSrc(fallbackSrc)
+      setImgError(true)
+    }
     setIsLoading(true)
   }, [src, fallbackSrc])
 
-  // If there's no src or there's already an error, show placeholder
-  if (!src || imgError) {
+  // If there's no valid src or there's already an error, show placeholder
+  if (!imgSrc || imgError) {
     return (
       <div 
         className={`${placeholderClassName} flex items-center justify-center h-full w-full ${props.className || ''}`}

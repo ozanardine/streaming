@@ -28,12 +28,23 @@ const ProfileSelector = () => {
             onClick={() => setCurrentProfile(profile)}
           >
             <div className="w-24 h-24 md:w-32 md:h-32 relative overflow-hidden rounded-lg mb-3 border-4 border-transparent group-hover:border-white transition-all duration-200 group-focus:outline-none group-focus:border-white">
-              <Image 
-                src={profile.avatar_url || '/images/default-avatar.png'} 
-                alt={profile.name} 
-                fill
-                className="object-cover"
-              />
+              {profile.avatar_url ? (
+                <Image 
+                  src={profile.avatar_url} 
+                  alt={profile.name || 'Profile'} 
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              ) : (
+                <Image 
+                  src="/images/default-avatar.png" 
+                  alt={profile.name || 'Profile'} 
+                  fill
+                  className="object-cover"
+                  unoptimized
+                />
+              )}
             </div>
             <h3 className="text-gray-400 group-hover:text-white transition-colors duration-200">{profile.name}</h3>
           </button>
