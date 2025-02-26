@@ -39,4 +39,4 @@ const SafeImage = ({
   )
 }
 
-export default SafeIma
+export default SafeImage
