@@ -43,16 +43,27 @@ export default function AdminDashboard() {
         // Buscar usuários
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select(`
-            id,
-            is_admin,
-            created_at,
-            profiles:profiles(*)
-          `)
+          .select('id, is_admin, created_at')
           .order('created_at', { ascending: false })
           
         if (userError) throw userError
-        setUsers(userData || [])
+        
+        // Buscar perfis para cada usuário
+        const usersWithProfiles = await Promise.all(
+          (userData || []).map(async (user) => {
+            const { data: profilesData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('user_id', user.id)
+            
+            return {
+              ...user,
+              profiles: profilesData || []
+            }
+          })
+        )
+        
+        setUsers(usersWithProfiles || [])
       } catch (err) {
         console.error('Erro ao buscar dados:', err)
         setError('Erro ao carregar dados. Tente novamente.')
@@ -285,7 +296,7 @@ export default function AdminDashboard() {
                           {new Date(user.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-text-secondary">
-                          {user.profiles?.length || 0}
+                          {Array.isArray(user.profiles) ? user.profiles.length : 0}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${user.is_admin ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
