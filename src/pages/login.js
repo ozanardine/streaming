@@ -1,14 +1,31 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
 import Link from 'next/link'
 import Image from 'next/image'
+import { useRouter } from 'next/router'
 
 export default function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
+  const [message, setMessage] = useState(null)
   const [loading, setLoading] = useState(false)
-  const { login } = useAuth()
+  const { login, user } = useAuth()
+  const router = useRouter()
+  
+  // Verificar se há mensagem de redirecionamento
+  useEffect(() => {
+    if (router.query.message === 'check-email') {
+      setMessage('Por favor, verifique seu email para confirmar o cadastro.')
+    }
+  }, [router.query])
+  
+  // Redirecionar se já estiver logado
+  useEffect(() => {
+    if (user) {
+      router.push('/')
+    }
+  }, [user, router])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -46,6 +63,12 @@ export default function Login() {
           </div>
         )}
         
+        {message && (
+          <div className="bg-green-500 bg-opacity-80 text-white p-3 rounded-md mb-6 text-sm">
+            {message}
+          </div>
+        )}
+        
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">
@@ -57,6 +80,7 @@ export default function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="w-full p-3 bg-background-light rounded border-0 text-white focus:ring-2 focus:ring-primary"
+              placeholder="seu@email.com"
               required
             />
           </div>
@@ -71,6 +95,7 @@ export default function Login() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full p-3 bg-background-light rounded border-0 text-white focus:ring-2 focus:ring-primary"
+              placeholder="Sua senha"
               required
             />
           </div>

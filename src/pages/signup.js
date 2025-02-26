@@ -47,16 +47,19 @@ export default function Signup() {
     setLoading(true)
     
     try {
-      await signup(email, password)
+      const { data, error: signupError } = await supabase.auth.signUp({
+        email,
+        password,
+      })
+      
+      if (signupError) throw signupError
       
       // Também criar registro na tabela users
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (user) {
+      if (data.user) {
         // Inserir registro na tabela users
         const { error: userError } = await supabase
           .from('users')
-          .insert([{ id: user.id, is_admin: false }])
+          .insert([{ id: data.user.id, is_admin: false }])
           
         if (userError) throw userError
       }
@@ -80,45 +83,74 @@ export default function Signup() {
   }
 
   return (
-    <div className="auth-container">
-      <div className="auth-card">
-        <h1>Criar Conta</h1>
+    <div className="min-h-screen flex items-center justify-center bg-black bg-opacity-75 px-4">
+      <div className="bg-background-dark rounded-md p-8 sm:p-10 w-full max-w-md">
+        <div className="mb-8 flex justify-center">
+          <div className="w-32 h-10 relative">
+            <Image
+              src="/images/logo.png"
+              alt="Streaming Familiar"
+              fill
+              className="object-contain"
+            />
+          </div>
+        </div>
         
-        {error && <div className="error-message">{error}</div>}
-        {message && <div className="success-message">{message}</div>}
+        <h1 className="text-2xl font-bold mb-6 text-center">Criar Conta</h1>
         
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="email">Email</label>
+        {error && (
+          <div className="bg-red-500 bg-opacity-80 text-white p-4 rounded-md mb-6 text-sm">
+            {error}
+          </div>
+        )}
+        
+        {message && (
+          <div className="bg-green-500 bg-opacity-80 text-white p-4 rounded-md mb-6 text-sm">
+            {message}
+          </div>
+        )}
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label htmlFor="email" className="block text-sm font-medium text-text-secondary mb-1">
+              Email
+            </label>
             <input
               id="email"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full p-3 bg-background-light rounded border-0 text-white focus:ring-2 focus:ring-primary"
               placeholder="seu@email.com"
               required
             />
           </div>
           
-          <div className="form-group">
-            <label htmlFor="password">Senha</label>
+          <div>
+            <label htmlFor="password" className="block text-sm font-medium text-text-secondary mb-1">
+              Senha
+            </label>
             <input
               id="password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              className="w-full p-3 bg-background-light rounded border-0 text-white focus:ring-2 focus:ring-primary"
               placeholder="Mínimo de 6 caracteres"
               required
             />
           </div>
           
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirmar Senha</label>
+          <div>
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-text-secondary mb-1">
+              Confirmar Senha
+            </label>
             <input
               id="confirmPassword"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full p-3 bg-background-light rounded border-0 text-white focus:ring-2 focus:ring-primary"
               placeholder="Digite a senha novamente"
               required
             />
@@ -126,16 +158,19 @@ export default function Signup() {
           
           <button 
             type="submit" 
-            className="submit-button"
+            className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded transition-colors duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
             disabled={loading}
           >
             {loading ? 'Criando conta...' : 'Criar Conta'}
           </button>
         </form>
         
-        <div className="auth-footer">
-          <p>
-            Já tem uma conta? <Link href="/login">Entrar</Link>
+        <div className="mt-6 text-center">
+          <p className="text-text-secondary">
+            Já tem uma conta?{' '}
+            <Link href="/login" className="text-white hover:text-primary transition-colors">
+              Entrar
+            </Link>
           </p>
         </div>
       </div>

@@ -23,7 +23,6 @@ export const AuthProvider = ({ children }) => {
       setUser(session?.user || null)
       if (!session?.user) {
         setProfile(null)
-        router.push('/login')
       }
     })
 
@@ -33,15 +32,16 @@ export const AuthProvider = ({ children }) => {
   }, [router])
 
   const login = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    setUser(data.user)
     router.push('/')
   }
 
   const signup = async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password })
+    const { data, error } = await supabase.auth.signUp({ email, password })
     if (error) throw error
-    router.push('/login?message=check-email')
+    return data
   }
 
   const logout = async () => {
