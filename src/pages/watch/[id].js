@@ -67,16 +67,27 @@ export default function WatchPage() {
   }, [user, profile, authLoading, router])
 
   if (authLoading || loading) {
-    return <div className="loading">Carregando...</div>
+    return (
+      <Layout title="Carregando...">
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+      </Layout>
+    )
   }
 
   if (error) {
     return (
-      <Layout>
-        <div className="error-container">
-          <h2>Erro</h2>
-          <p>{error}</p>
-          <button onClick={() => router.back()}>Voltar</button>
+      <Layout title="Erro">
+        <div className="max-w-md mx-auto bg-background-light p-6 rounded-lg shadow-lg">
+          <h2 className="text-xl font-bold text-red-500 mb-4">Erro</h2>
+          <p className="mb-6">{error}</p>
+          <button 
+            onClick={() => router.back()}
+            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
+          >
+            Voltar
+          </button>
         </div>
       </Layout>
     )
@@ -88,10 +99,10 @@ export default function WatchPage() {
 
   return (
     <Layout title={media.title}>
-      <div className="watch-container">
-        <h1>{media.title}</h1>
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6">{media.title}</h1>
         
-        <div className="video-container">
+        <div className="mb-8">
           <VideoPlayer 
             mediaUrl={media.media_url} 
             mediaId={media.id} 
@@ -99,45 +110,52 @@ export default function WatchPage() {
           />
         </div>
         
-        <div className="media-details">
-          <div className="media-actions">
+        <div className="space-y-8">
+          <div className="flex items-center space-x-4">
             <FavoriteButton mediaId={media.id} />
             
-            <Link href={`/browse?category=${encodeURIComponent(media.category)}`}>
-              <span className="category-tag">{media.category}</span>
-            </Link>
+            {media.category && (
+              <Link 
+                href={`/browse?category=${encodeURIComponent(media.category)}`}
+                className="px-3 py-1 bg-background-light hover:bg-background text-sm rounded-md transition-colors"
+              >
+                {media.category}
+              </Link>
+            )}
           </div>
           
           {media.description && (
-            <div className="media-description">
-              <h3>Descrição</h3>
-              <p>{media.description}</p>
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Descrição</h3>
+              <p className="text-text-secondary">{media.description}</p>
             </div>
           )}
           
           {relatedMedia.length > 0 && (
-            <div className="related-media">
-              <h3>Conteúdo relacionado</h3>
-              <div className="related-grid">
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Conteúdo relacionado</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {relatedMedia.map(item => (
-                  <Link href={`/watch/${item.id}`} key={item.id}>
-                    <div className="related-item">
-                      <div className="related-thumbnail">
-                        {item.thumbnail_url ? (
-                          <Image 
-                            src={item.thumbnail_url} 
-                            alt={item.title} 
-                            width={120} 
-                            height={68}
-                          />
-                        ) : (
-                          <div className="no-thumbnail small">
-                            <span>{item.title}</span>
-                          </div>
-                        )}
-                      </div>
-                      <span className="related-title">{item.title}</span>
+                  <Link 
+                    href={`/watch/${item.id}`} 
+                    key={item.id}
+                    className="block group"
+                  >
+                    <div className="aspect-video relative rounded overflow-hidden bg-background-dark mb-2">
+                      {item.thumbnail_url ? (
+                        <Image 
+                          src={item.thumbnail_url} 
+                          alt={item.title} 
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center p-2 text-xs text-center text-text-secondary">
+                          <span>{item.title}</span>
+                        </div>
+                      )}
                     </div>
+                    <h4 className="text-sm group-hover:text-primary transition-colors duration-200 truncate">{item.title}</h4>
                   </Link>
                 ))}
               </div>
