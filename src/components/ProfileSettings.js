@@ -165,8 +165,12 @@ const ProfileSettings = ({ profileId, isNew = false }) => {
               <Image 
                 src={avatarUrl} 
                 alt="Avatar do perfil" 
-                fill
-                className="object-cover"
+                width={128} 
+                height={128}
+                className="object-cover w-full h-full"
+                onError={(e) => {
+                  e.target.src = '/images/default-avatar.png'
+                }}
               />
             </div>
             <button 
@@ -174,25 +178,34 @@ const ProfileSettings = ({ profileId, isNew = false }) => {
               className="px-4 py-2 bg-background hover:bg-background-dark text-white rounded-md text-sm transition-colors duration-200"
               onClick={() => setShowAvatarSelector(!showAvatarSelector)}
             >
-              Alterar Avatar
+              {showAvatarSelector ? 'Fechar Seletor' : 'Alterar Avatar'}
             </button>
             
             {showAvatarSelector && (
-              <div className="mt-4 bg-background-dark p-4 rounded-lg shadow-lg w-full max-w-xs">
-                <div className="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto">
+              <div className="mt-4 bg-background-dark p-4 rounded-lg shadow-lg w-full sm:w-72">
+                <h3 className="text-white font-medium mb-3">Escolha um avatar</h3>
+                <div className="grid grid-cols-3 gap-3 max-h-60 overflow-y-auto p-1">
                   {avatarOptions.map((avatar, index) => (
                     <button 
                       key={index} 
-                      className="relative aspect-square rounded-md overflow-hidden border-2 hover:border-primary focus:border-primary transition-colors duration-200"
-                      style={{ borderColor: avatarUrl === avatar ? '#e50914' : 'transparent' }}
+                      className={`aspect-square w-full rounded-md overflow-hidden border-2 hover:border-primary focus:border-primary transition-colors duration-200 ${
+                        avatarUrl === avatar ? 'ring-2 ring-primary border-primary' : 'border-transparent'
+                      }`}
                       onClick={() => selectAvatar(avatar)}
                     >
-                      <Image 
-                        src={avatar} 
-                        alt={`Avatar ${index + 1}`} 
-                        fill
-                        className="object-cover"
-                      />
+                      <div className="relative w-full h-full bg-background-dark">
+                        <Image 
+                          src={avatar}
+                          alt={`Avatar ${index + 1}`}
+                          width={80}
+                          height={80}
+                          className="object-cover w-full h-full"
+                          onError={(e) => {
+                            console.log(`Erro ao carregar avatar: ${avatar}`)
+                            e.target.src = '/images/default-avatar.png'
+                          }}
+                        />
+                      </div>
                     </button>
                   ))}
                 </div>
