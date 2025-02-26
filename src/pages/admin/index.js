@@ -11,6 +11,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('media')
+  const [showSeriesLink, setShowSeriesLink] = useState(false)
   const [error, setError] = useState(null)
   const { user, isAdmin } = useAuth()
   const router = useRouter()
@@ -156,7 +157,13 @@ export default function AdminDashboard() {
               className={`px-6 py-3 font-medium text-sm focus:outline-none ${activeTab === 'media' ? 'text-primary border-b-2 border-primary' : 'text-text-secondary hover:text-white'}`}
               onClick={() => setActiveTab('media')}
             >
-              Gerenciar Conteúdo
+              Gerenciar Filmes
+            </button>
+            <button 
+              className={`px-6 py-3 font-medium text-sm focus:outline-none ${activeTab === 'series' ? 'text-primary border-b-2 border-primary' : 'text-text-secondary hover:text-white'}`}
+              onClick={() => setActiveTab('series')}
+            >
+              Gerenciar Séries
             </button>
             <button 
               className={`px-6 py-3 font-medium text-sm focus:outline-none ${activeTab === 'users' ? 'text-primary border-b-2 border-primary' : 'text-text-secondary hover:text-white'}`}
@@ -253,6 +260,21 @@ export default function AdminDashboard() {
                 </table>
               </div>
             )}
+          </div>
+        )}
+        
+        {activeTab === 'series' && (
+          <div className="bg-background-light rounded-lg p-8 text-center">
+            <h2 className="text-xl font-bold mb-6">Gerenciamento de Séries e Animes</h2>
+            <p className="text-text-secondary mb-6">
+              Acesse o painel de gerenciamento de séries e animes para adicionar temporadas e episódios.
+            </p>
+            <Link 
+              href="/admin/series"
+              className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-bold rounded-md transition-colors inline-block"
+            >
+              Acessar Gerenciamento de Séries
+            </Link>
           </div>
         )}
         

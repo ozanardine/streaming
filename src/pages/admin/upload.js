@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from '../../hooks/useAuth'
 import Layout from '../../components/Layout'
-import { uploadToSupabase, saveExternalUrl } from '../../lib/mediaStorage'
 import { supabase } from '../../lib/supabase'
 
 export default function UploadPage() {
@@ -29,10 +28,36 @@ export default function UploadPage() {
     }
   }, [user, isAdmin, router])
 
+  // Função para fazer upload de um arquivo para o Supabase Storage
+  const uploadFile = async (file, folder = 'videos') => {
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`
+    const filePath = `${folder}/${fileName}`
+
+    const { error } = await supabase.storage
+      .from('media')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+        onUploadProgress: (progress) => {
+          const percent = Math.round((progress.loaded / progress.total) * 100)
+          setProgress(percent)
+        }
+      })
+
+    if (error) {
+      throw error
+    }
+
+    const { data } = supabase.storage.from('media').getPublicUrl(filePath)
+    return data.publicUrl
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
+    setProgress(0)
     
     try {
       // Verificar se é admin
@@ -40,30 +65,42 @@ export default function UploadPage() {
         throw new Error('Acesso não autorizado')
       }
       
-      let mediaUrl = ''
-      let thumbUrl = thumbnailUrl
+      if (!title.trim()) {
+        throw new Error('O título é obrigatório')
+      }
+
+      let mediaUrl = '';
+      let thumbUrl = thumbnailUrl;
       
+      // Processar link externo ou arquivo
       if (isExternal) {
-        // Salvar URL externa
-        if (!externalUrl) {
-          throw new Error('URL do vídeo é obrigatória')
-        }
-        mediaUrl = externalUrl
-      } else {
-        // Upload de arquivo
-        if (!file) {
-          throw new Error('Arquivo de vídeo é obrigatório')
+        // Verificar se a URL externa foi fornecida
+        if (!externalUrl.trim()) {
+          throw new Error('A URL do vídeo é obrigatória')
         }
         
-        const uploadResult = await uploadToSupabase(file, 'videos')
-        mediaUrl = uploadResult.url
+        // Usar a URL externa diretamente
+        mediaUrl = externalUrl;
+        
+        // Avançar progresso para feedback visual
+        setProgress(50);
+      } else {
+        // Verificar se o arquivo foi selecionado
+        if (!file) {
+          throw new Error('O arquivo de vídeo é obrigatório')
+        }
+        
+        // Fazer upload do arquivo
+        mediaUrl = await uploadFile(file, 'videos');
       }
       
-      // Upload de thumbnail se fornecido
+      // Upload de thumbnail se fornecido (apenas se um arquivo foi selecionado)
       if (thumbnailFile) {
-        const thumbResult = await uploadToSupabase(thumbnailFile, 'thumbnails')
-        thumbUrl = thumbResult.url
+        thumbUrl = await uploadFile(thumbnailFile, 'thumbnails');
       }
+      
+      // Avançar progresso para feedback visual
+      setProgress(75);
       
       // Salvar informações no banco de dados
       const { data, error: dbError } = await supabase
@@ -74,16 +111,24 @@ export default function UploadPage() {
           category,
           media_url: mediaUrl,
           thumbnail_url: thumbUrl,
+          type: isExternal ? 'external' : 'uploaded',
           added_by: user.id
         }])
         .select()
       
       if (dbError) throw dbError
       
-      router.push('/admin')
+      // Concluir progresso
+      setProgress(100);
+      
+      // Redirecionar para a página de admin após sucesso
+      setTimeout(() => {
+        router.push('/admin')
+      }, 1000);
     } catch (err) {
       console.error('Erro ao fazer upload:', err)
-      setError(err.message)
+      setError(err.message || 'Ocorreu um erro ao tentar adicionar o vídeo.')
+      setProgress(0)
     } finally {
       setLoading(false)
     }
@@ -172,7 +217,7 @@ export default function UploadPage() {
                   onChange={(e) => setExternalUrl(e.target.value)}
                   className="w-full p-3 bg-background rounded border-0 text-white focus:ring-2 focus:ring-primary"
                   required={isExternal}
-                  placeholder="https://drive.google.com/file/d/..."
+                  placeholder="https://youtu.be/exemplo ou https://drive.google.com/file/d/..."
                 />
                 <p className="mt-1 text-xs text-text-secondary">
                   Para Google Drive, certifique-se de que o link permita acesso a qualquer pessoa com o link
@@ -244,7 +289,7 @@ export default function UploadPage() {
                     className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-primary"
                   ></div>
                 </div>
-                <p className="text-center text-xs mt-1 text-text-secondary">{progress}%</p>
+                <p className="text-center text-xs mt-1 text-text-secondary">{progress}% {progress === 100 ? 'Concluído!' : 'Enviando...'}</p>
               </div>
             )}
             
