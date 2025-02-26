@@ -4,10 +4,20 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useAuth } from '../../hooks/useAuth'
 import Layout from '../../components/Layout'
-import VideoPlayer from '../../components/VideoPlayer'
 import FavoriteButton from '../../components/FavoriteButton'
 import { getMediaDetails } from '../../lib/mediaStorage'
 import { supabase } from '../../lib/supabase'
+import dynamic from 'next/dynamic'
+
+// Importar o VideoPlayer sem SSR
+const VideoPlayer = dynamic(() => import('../../components/VideoPlayer'), { 
+  ssr: false,
+  loading: () => (
+    <div className="aspect-video bg-background-dark flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  )
+})
 
 export default function WatchPage() {
   const router = useRouter()
