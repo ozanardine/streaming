@@ -7,22 +7,63 @@ const AuthContext = createContext()
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [profile, setProfile] = useState(null)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
+
+  // Verificar se o usuário é admin
+  const checkIfAdmin = async (userId) => {
+    if (!userId) return false
+    
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('is_admin')
+        .eq('id', userId)
+        .single()
+      
+      if (error) {
+        console.error('Erro ao verificar status de admin:', error)
+        return false
+      }
+      
+      return data?.is_admin || false
+    } catch (err) {
+      console.error('Erro ao verificar status de admin:', err)
+      return false
+    }
+  }
 
   useEffect(() => {
     const setSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
-      setUser(session?.user || null)
+      const currentUser = session?.user || null
+      setUser(currentUser)
+      
+      if (currentUser) {
+        // Verificar se é admin quando o usuário é carregado
+        const adminStatus = await checkIfAdmin(currentUser.id)
+        setIsAdmin(adminStatus)
+      } else {
+        setIsAdmin(false)
+      }
+      
       setLoading(false)
     }
     
     setSession()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null)
-      if (!session?.user) {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user || null
+      setUser(currentUser)
+      
+      if (!currentUser) {
         setProfile(null)
+        setIsAdmin(false)
+      } else {
+        // Verificar se é admin quando o usuário muda
+        const adminStatus = await checkIfAdmin(currentUser.id)
+        setIsAdmin(adminStatus)
       }
     })
 
@@ -34,7 +75,13 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
+    
     setUser(data.user)
+    
+    // Verificar se o usuário que acabou de fazer login é admin
+    const adminStatus = await checkIfAdmin(data.user.id)
+    setIsAdmin(adminStatus)
+    
     router.push('/')
   }
 
@@ -48,6 +95,7 @@ export const AuthProvider = ({ children }) => {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    setIsAdmin(false)
     router.push('/login')
   }
 
@@ -60,6 +108,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user,
       profile,
+      isAdmin,
       loading,
       login,
       signup,

@@ -6,7 +6,7 @@ import { useAuth } from '../hooks/useAuth'
 import { useProfiles } from '../hooks/useProfiles'
 
 const Navbar = () => {
-  const { user, profile, logout, setCurrentProfile } = useAuth()
+  const { user, profile, logout, setCurrentProfile, isAdmin } = useAuth()
   const { profiles } = useProfiles()
   const [showMenu, setShowMenu] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -40,9 +40,6 @@ const Navbar = () => {
     setCurrentProfile(newProfile)
     setShowMenu(false)
   }
-
-  // Verificar se o usuário é admin
-  const isAdmin = user?.is_admin;
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm">

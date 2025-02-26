@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/router'
 import { useAuth } from '../../hooks/useAuth'
 import Layout from '../../components/Layout'
@@ -6,7 +6,7 @@ import { uploadToSupabase, saveExternalUrl } from '../../lib/mediaStorage'
 import { supabase } from '../../lib/supabase'
 
 export default function UploadPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, isAdmin } = useAuth()
   const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -20,18 +20,14 @@ export default function UploadPage() {
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(0)
 
-  // Verificar se é administrador
-  const checkAdmin = async () => {
-    if (!user) return false
-    
-    const { data } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-    
-    return data?.is_admin || false
-  }
+  // Verificar se o usuário está autenticado e é admin
+  useEffect(() => {
+    if (!user) {
+      router.push('/login')
+    } else if (!isAdmin) {
+      router.push('/browse')
+    }
+  }, [user, isAdmin, router])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -40,7 +36,6 @@ export default function UploadPage() {
     
     try {
       // Verificar se é admin
-      const isAdmin = await checkAdmin()
       if (!isAdmin) {
         throw new Error('Acesso não autorizado')
       }
@@ -92,6 +87,11 @@ export default function UploadPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Se não for admin, não renderizar o conteúdo
+  if (!isAdmin) {
+    return null
   }
 
   return (

@@ -7,7 +7,7 @@ import { supabase } from '../../../lib/supabase'
 import Image from 'next/image'
 
 export default function EditMediaPage() {
-  const { user, loading: authLoading } = useAuth()
+  const { user, isAdmin } = useAuth()
   const router = useRouter()
   const { id } = router.query
   
@@ -24,32 +24,20 @@ export default function EditMediaPage() {
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(false)
 
-  // Verificar se é administrador
-  const checkAdmin = async () => {
-    if (!user) return false
-    
-    const { data } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
-    
-    return data?.is_admin || false
-  }
-
-  // Carregar dados da mídia
+  // Verificar se o usuário está autenticado e é admin
   useEffect(() => {
+    if (!user) {
+      router.push('/login')
+      return
+    } else if (!isAdmin) {
+      router.push('/browse')
+      return
+    }
+    
+    if (!id) return
+    
     const fetchMedia = async () => {
-      if (!id || !user) return
-      
       try {
-        // Verificar se é admin
-        const isAdmin = await checkAdmin()
-        if (!isAdmin) {
-          router.push('/browse')
-          return
-        }
-        
         const { data, error } = await supabase
           .from('media')
           .select('*')
@@ -82,10 +70,8 @@ export default function EditMediaPage() {
       }
     }
     
-    if (!authLoading) {
-      fetchMedia()
-    }
-  }, [id, user, authLoading, router])
+    fetchMedia()
+  }, [id, user, isAdmin, router])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -95,7 +81,6 @@ export default function EditMediaPage() {
     
     try {
       // Verificar se é admin
-      const isAdmin = await checkAdmin()
       if (!isAdmin) {
         throw new Error('Acesso não autorizado')
       }
@@ -153,7 +138,7 @@ export default function EditMediaPage() {
     }
   }
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <Layout title="Editando Mídia">
         <div className="flex justify-center items-center min-h-[60vh]">
@@ -161,6 +146,11 @@ export default function EditMediaPage() {
         </div>
       </Layout>
     )
+  }
+
+  // Se não for admin, não renderizar o conteúdo
+  if (!isAdmin) {
+    return null
   }
 
   if (error && !media) {

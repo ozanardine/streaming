@@ -12,43 +12,23 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState('media')
   const [error, setError] = useState(null)
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const router = useRouter()
   
   useEffect(() => {
-    const checkAdmin = async () => {
+    const fetchData = async () => {
       if (!user) {
         router.push('/login')
-        return false
+        return
       }
       
-      try {
-        const { data, error } = await supabase
-          .from('users')
-          .select('is_admin')
-          .eq('id', user.id)
-          .single()
-          
-        if (error) throw error
-        
-        if (!data?.is_admin) {
-          router.push('/browse')
-          return false
-        }
-        
-        return true
-      } catch (err) {
-        console.error('Erro ao verificar admin:', err)
+      // Usar o isAdmin do contexto de autenticação em vez de fazer nova consulta
+      if (!isAdmin) {
         router.push('/browse')
-        return false
+        return
       }
-    }
-    
-    const fetchData = async () => {
-      setLoading(true)
       
-      const isAdmin = await checkAdmin()
-      if (!isAdmin) return
+      setLoading(true)
       
       try {
         // Buscar mídia
@@ -82,7 +62,7 @@ export default function AdminDashboard() {
     }
     
     fetchData()
-  }, [user, router])
+  }, [user, isAdmin, router])
   
   const deleteMedia = async (id) => {
     if (confirm('Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.')) {
@@ -133,6 +113,11 @@ export default function AdminDashboard() {
         </div>
       </Layout>
     )
+  }
+
+  // Se não for admin, não renderizar o conteúdo
+  if (!isAdmin) {
+    return null
   }
   
   return (
