@@ -18,7 +18,11 @@ export default function Home() {
   }, [user, profile, loading, router])
 
   if (loading) {
-    return <div className="loading">Carregando...</div>
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   if (user && !profile) {

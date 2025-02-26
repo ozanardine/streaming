@@ -8,7 +8,8 @@ import CategoryRow from '../components/CategoryRow'
 export default function Browse() {
   const { user, profile, loading: authLoading } = useAuth()
   const { media: recentlyAdded, loading: mediaLoading } = useMedia()
-  const { media: continueWatching, loading: continueLoading } = useMedia('continue')
+  const { media: filmsMedia, loading: filmsLoading } = useMedia('filmes')
+  const { media: seriesMedia, loading: seriesLoading } = useMedia('series')
   const router = useRouter()
 
   useEffect(() => {
@@ -17,8 +18,12 @@ export default function Browse() {
     }
   }, [user, profile, authLoading, router])
 
-  if (authLoading || mediaLoading || continueLoading) {
-    return <div className="loading">Carregando...</div>
+  if (authLoading || mediaLoading || filmsLoading || seriesLoading) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    )
   }
 
   if (!user || !profile) {
@@ -33,8 +38,8 @@ export default function Browse() {
 
   return (
     <Layout>
-      <div className="browse-page">
-        <h1 className="welcome-message">Olá, {profile.name}</h1>
+      <div className="pt-4 pb-8">
+        <h1 className="text-3xl font-bold mb-8">Olá, {profile.name}</h1>
 
         {mediaToResume.length > 0 && (
           <CategoryRow 
@@ -48,7 +53,19 @@ export default function Browse() {
           media={recentlyAdded} 
         />
         
-        {/* Outras categorias podem ser adicionadas aqui */}
+        {filmsMedia.length > 0 && (
+          <CategoryRow 
+            title="Filmes" 
+            media={filmsMedia} 
+          />
+        )}
+        
+        {seriesMedia.length > 0 && (
+          <CategoryRow 
+            title="Séries" 
+            media={seriesMedia} 
+          />
+        )}
       </div>
     </Layout>
   )

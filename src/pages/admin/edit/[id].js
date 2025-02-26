@@ -156,7 +156,9 @@ export default function EditMediaPage() {
   if (authLoading || loading) {
     return (
       <Layout title="Editando Mídia">
-        <div className="loading">Carregando...</div>
+        <div className="flex justify-center items-center min-h-[60vh]">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
       </Layout>
     )
   }
@@ -164,10 +166,15 @@ export default function EditMediaPage() {
   if (error && !media) {
     return (
       <Layout title="Erro">
-        <div className="error-container">
-          <h2>Erro</h2>
-          <p>{error}</p>
-          <button onClick={() => router.push('/admin')}>Voltar para Admin</button>
+        <div className="max-w-md mx-auto bg-background-light p-6 rounded-lg shadow-lg">
+          <h2 className="text-xl font-bold text-red-500 mb-4">Erro</h2>
+          <p className="mb-6">{error}</p>
+          <button 
+            onClick={() => router.push('/admin')}
+            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
+          >
+            Voltar para Admin
+          </button>
         </div>
       </Layout>
     )
@@ -177,124 +184,170 @@ export default function EditMediaPage() {
 
   return (
     <Layout title={`Editando: ${media.title}`}>
-      <div className="admin-upload">
-        <h1>Editar Vídeo</h1>
+      <div className="max-w-2xl mx-auto py-8">
+        <h1 className="text-2xl font-bold mb-6">Editar Vídeo</h1>
         
-        {error && <div className="error-message">{error}</div>}
-        {success && <div className="success-message">Mídia atualizada com sucesso!</div>}
+        {error && (
+          <div className="bg-red-500 bg-opacity-80 text-white p-4 rounded-md mb-6">
+            {error}
+          </div>
+        )}
         
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="title">Título</label>
-            <input
-              id="title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
+        {success && (
+          <div className="bg-green-500 bg-opacity-80 text-white p-4 rounded-md mb-6">
+            Mídia atualizada com sucesso!
           </div>
-          
-          <div className="form-group">
-            <label htmlFor="description">Descrição</label>
-            <textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={3}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="category">Categoria</label>
-            <input
-              id="category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-            />
-          </div>
-          
-          <div className="form-group">
-            <label>
+        )}
+        
+        <form onSubmit={handleSubmit} className="bg-background-light p-6 rounded-lg shadow">
+          <div className="space-y-6">
+            <div>
+              <label htmlFor="title" className="block text-sm font-medium text-text-secondary mb-1">
+                Título
+              </label>
               <input
+                id="title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="w-full p-3 bg-background rounded border-0 text-white focus:ring-2 focus:ring-primary"
+                required
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="description" className="block text-sm font-medium text-text-secondary mb-1">
+                Descrição
+              </label>
+              <textarea
+                id="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                rows={3}
+                className="w-full p-3 bg-background rounded border-0 text-white focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="category" className="block text-sm font-medium text-text-secondary mb-1">
+                Categoria
+              </label>
+              <input
+                id="category"
+                type="text"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="w-full p-3 bg-background rounded border-0 text-white focus:ring-2 focus:ring-primary"
+              />
+            </div>
+            
+            <div className="flex items-center">
+              <input
+                id="isExternal"
                 type="checkbox"
                 checked={isExternal}
                 onChange={(e) => setIsExternal(e.target.checked)}
+                className="h-4 w-4 text-primary border-0 focus:ring-primary bg-background"
               />
-              Usar URL externa (YouTube, Google Drive, etc)
-            </label>
-          </div>
-          
-          {isExternal && (
-            <div className="form-group">
-              <label htmlFor="externalUrl">URL do Vídeo</label>
-              <input
-                id="externalUrl"
-                type="url"
-                value={externalUrl}
-                onChange={(e) => setExternalUrl(e.target.value)}
-                required={isExternal}
-                placeholder="https://drive.google.com/file/d/..."
-              />
-              <small>
-                Para Google Drive, certifique-se de que o link permita acesso a qualquer pessoa com o link
-              </small>
+              <label htmlFor="isExternal" className="ml-2 block text-sm text-text-secondary">
+                Usar URL externa (YouTube, Google Drive, etc)
+              </label>
             </div>
-          )}
-          
-          <div className="form-group">
-            <label htmlFor="thumbnailUrl">URL da Miniatura</label>
-            <input
-              id="thumbnailUrl"
-              type="url"
-              value={thumbnailUrl}
-              onChange={(e) => setThumbnailUrl(e.target.value)}
-              placeholder="https://exemplo.com/imagem.jpg"
-            />
-          </div>
-          
-          <div className="form-group">
-            <label htmlFor="thumbnailFile">Ou faça upload de uma nova miniatura</label>
-            <input
-              id="thumbnailFile"
-              type="file"
-              accept="image/*"
-              onChange={handleFileChange}
-            />
-          </div>
-          
-          {thumbnailUrl && !thumbnailFile && (
-            <div className="current-thumbnail">
-              <p>Miniatura atual:</p>
-              <div className="thumbnail-preview">
-                <Image 
-                  src={thumbnailUrl}
-                  alt="Miniatura atual"
-                  width={200}
-                  height={112}
-                />
-              </div>
-            </div>
-          )}
-          
-          <div className="action-buttons">
-            <button 
-              type="button" 
-              className="cancel-button"
-              onClick={() => router.push('/admin')}
-              disabled={saving}
-            >
-              Cancelar
-            </button>
             
-            <button 
-              type="submit" 
-              className="submit-button"
-              disabled={saving}
-            >
-              {saving ? 'Salvando...' : 'Salvar Alterações'}
-            </button>
+            {isExternal && (
+              <div>
+                <label htmlFor="externalUrl" className="block text-sm font-medium text-text-secondary mb-1">
+                  URL do Vídeo
+                </label>
+                <input
+                  id="externalUrl"
+                  type="url"
+                  value={externalUrl}
+                  onChange={(e) => setExternalUrl(e.target.value)}
+                  className="w-full p-3 bg-background rounded border-0 text-white focus:ring-2 focus:ring-primary"
+                  required={isExternal}
+                  placeholder="https://drive.google.com/file/d/..."
+                />
+                <p className="mt-1 text-xs text-text-secondary">
+                  Para Google Drive, certifique-se de que o link permita acesso a qualquer pessoa com o link
+                </p>
+              </div>
+            )}
+            
+            <div>
+              <label htmlFor="thumbnailUrl" className="block text-sm font-medium text-text-secondary mb-1">
+                URL da Miniatura
+              </label>
+              <input
+                id="thumbnailUrl"
+                type="url"
+                value={thumbnailUrl}
+                onChange={(e) => setThumbnailUrl(e.target.value)}
+                className="w-full p-3 bg-background rounded border-0 text-white focus:ring-2 focus:ring-primary"
+                placeholder="https://exemplo.com/imagem.jpg"
+              />
+            </div>
+            
+            <div>
+              <label htmlFor="thumbnailFile" className="block text-sm font-medium text-text-secondary mb-1">
+                Ou faça upload de uma nova miniatura
+              </label>
+              <input
+                id="thumbnailFile"
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="block w-full text-sm text-text-secondary
+                  file:mr-4 file:py-2 file:px-4
+                  file:rounded-md file:border-0
+                  file:text-sm file:font-medium
+                  file:bg-primary file:text-white
+                  hover:file:bg-primary-dark
+                  cursor-pointer"
+              />
+            </div>
+            
+            {thumbnailUrl && !thumbnailFile && (
+              <div className="mt-2">
+                <p className="text-sm text-text-secondary mb-2">Miniatura atual:</p>
+                <div className="w-48 h-27 relative rounded overflow-hidden">
+                  <Image 
+                    src={thumbnailUrl}
+                    alt="Miniatura atual"
+                    width={200}
+                    height={112}
+                    className="object-cover"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div className="flex space-x-4 pt-4">
+              <button 
+                type="button" 
+                className="px-4 py-2 bg-background hover:bg-background-dark text-white rounded-md transition-colors"
+                onClick={() => router.push('/admin')}
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+              
+              <button 
+                type="submit" 
+                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors flex-1"
+                disabled={saving}
+              >
+                {saving ? (
+                  <span className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Salvando...
+                  </span>
+                ) : 'Salvar Alterações'}
+              </button>
+            </div>
           </div>
         </form>
       </div>
