@@ -1,7 +1,8 @@
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
+import { formatExternalUrl, getVideoUrlType } from './videoHelpers'
 
-// Opção 1: Usando o storage gratuito do Supabase (limite de 1GB no plano gratuito)
+// Upload de arquivo para o Supabase Storage
 export const uploadToSupabase = async (file, folder = 'videos') => {
   if (!file) {
     throw new Error('Nenhum arquivo fornecido')
@@ -52,16 +53,21 @@ export const uploadToSupabase = async (file, folder = 'videos') => {
   }
 }
 
-// Opção 2: Usando URLs externas (ex: já hospedadas em outro lugar)
-export const saveExternalUrl = async (url, title, thumbnailUrl = null) => {
+// Adicionar URL externa ao banco de dados
+export const saveExternalUrl = async (url, title, description = '', category = '', thumbnailUrl = null) => {
+  const urlType = getVideoUrlType(url);
+  const formattedUrl = formatExternalUrl(url, urlType);
+  
   const { data, error } = await supabase
     .from('media')
     .insert([
       { 
         title,
-        media_url: url,
+        description,
+        category,
+        media_url: formattedUrl,
         thumbnail_url: thumbnailUrl,
-        type: 'external'
+        type: urlType
       }
     ])
     .select()
@@ -106,36 +112,38 @@ export const getMediaDetails = async (id) => {
 
 // Função para atualizar o progresso de visualização
 export const updateWatchProgress = async (mediaId, profileId, progress, duration) => {
+  if (!mediaId || !profileId) {
+    console.error('MediaID ou ProfileID não fornecidos');
+    return null;
+  }
+  
   try {
-    // Verificar se o registro já existe
-    const { data: existingData, error: checkError } = await supabase
+    // Verificar se o registro já existe usando uma abordagem mais segura
+    const checkResponse = await supabase
       .from('watch_progress')
       .select('id')
       .eq('media_id', mediaId)
-      .eq('profile_id', profileId)
-      .maybeSingle()
-    
-    if (checkError && checkError.code !== 'PGRST116') {
-      // PGRST116 é o código para "não encontrado", que é esperado se não houver registro
-      throw checkError
+      .eq('profile_id', profileId);
+      
+    if (checkResponse.error) {
+      throw checkResponse.error;
     }
     
-    let result;
+    const existingRecords = checkResponse.data || [];
     
-    if (existingData) {
+    if (existingRecords.length > 0) {
       // Atualizar registro existente
       const { data, error } = await supabase
         .from('watch_progress')
         .update({
           progress,
           duration,
-          last_watched: new Date()
+          last_watched: new Date().toISOString()
         })
-        .eq('id', existingData.id)
-        .select()
+        .eq('id', existingRecords[0].id);
       
-      if (error) throw error
-      result = data[0]
+      if (error) throw error;
+      return data?.[0] || existingRecords[0];
     } else {
       // Inserir novo registro
       const { data, error } = await supabase
@@ -146,18 +154,15 @@ export const updateWatchProgress = async (mediaId, profileId, progress, duration
             profile_id: profileId,
             progress,
             duration,
-            last_watched: new Date()
+            last_watched: new Date().toISOString()
           }
-        ])
-        .select()
+        ]);
       
-      if (error) throw error
-      result = data[0]
+      if (error) throw error;
+      return data?.[0] || { media_id: mediaId, profile_id: profileId, progress, duration };
     }
-    
-    return result
   } catch (error) {
-    console.error('Erro ao atualizar progresso de visualização:', error)
+    console.error('Erro ao atualizar progresso de visualização:', error);
     
     // Mesmo com erro, não interrompemos a experiência do usuário
     return { 
@@ -165,6 +170,6 @@ export const updateWatchProgress = async (mediaId, profileId, progress, duration
       profile_id: profileId,
       progress,
       duration
-    }
+    };
   }
 }

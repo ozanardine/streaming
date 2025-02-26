@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 const FavoriteButton = ({ mediaId }) => {
   const [isFavorite, setIsFavorite] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [favoriteId, setFavoriteId] = useState(null)
   const { profile } = useAuth()
 
   useEffect(() => {
@@ -15,22 +16,30 @@ const FavoriteButton = ({ mediaId }) => {
       }
       
       try {
-        // Verificar se o item está nos favoritos
+        // Usar uma abordagem mais segura para verificar favoritos
         const { data, error } = await supabase
           .from('favorites')
           .select('id')
           .eq('profile_id', profile.id)
-          .eq('media_id', mediaId)
-          .maybeSingle()
+          .eq('media_id', mediaId);
           
-        if (error && error.code !== 'PGRST116') {
-          // PGRST116 é o código para "não encontrado", que é esperado se não for favorito
-          console.error('Erro ao verificar favorito:', error)
+        if (error) {
+          console.error('Erro ao verificar favorito:', error);
+          setIsFavorite(false);
+          setLoading(false);
+          return;
         }
         
-        setIsFavorite(!!data)
+        // Se encontrou pelo menos um registro, é favorito
+        if (data && data.length > 0) {
+          setIsFavorite(true);
+          setFavoriteId(data[0].id);
+        } else {
+          setIsFavorite(false);
+        }
       } catch (err) {
         console.error('Erro ao verificar favorito:', err)
+        setIsFavorite(false)
       } finally {
         setLoading(false)
       }
@@ -44,38 +53,48 @@ const FavoriteButton = ({ mediaId }) => {
     
     try {
       if (isFavorite) {
-        // Remover dos favoritos
-        const { error } = await supabase
-          .from('favorites')
-          .delete()
-          .eq('profile_id', profile.id)
-          .eq('media_id', mediaId)
-          
-        if (error) throw error
+        // Se já temos o ID, usamos diretamente
+        if (favoriteId) {
+          const { error } = await supabase
+            .from('favorites')
+            .delete()
+            .eq('id', favoriteId);
+            
+          if (error) throw error;
+        } else {
+          // Caso não tenhamos o ID (por algum motivo), usamos as chaves compostas
+          const { error } = await supabase
+            .from('favorites')
+            .delete()
+            .eq('profile_id', profile.id)
+            .eq('media_id', mediaId);
+            
+          if (error) throw error;
+        }
         
-        setIsFavorite(false)
+        setIsFavorite(false);
+        setFavoriteId(null);
       } else {
         // Adicionar aos favoritos
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('favorites')
           .insert([{
             profile_id: profile.id,
             media_id: mediaId
           }])
+          .select();
           
-        if (error) throw error
+        if (error) throw error;
         
-        setIsFavorite(true)
+        if (data && data.length > 0) {
+          setFavoriteId(data[0].id);
+        }
+        
+        setIsFavorite(true);
       }
     } catch (err) {
-      console.error('Erro ao atualizar favorito:', err)
-      // Interface mais amigável - feedback visual em vez de alerta
-      const message = isFavorite 
-        ? 'Não foi possível remover dos favoritos. Tente novamente.' 
-        : 'Não foi possível adicionar aos favoritos. Tente novamente.';
-      
-      // Opcionalmente, você pode mostrar um toast/notification em vez de um alert
-      console.error(message);
+      console.error('Erro ao atualizar favorito:', err);
+      // Mantém o mesmo estado para garantir consistência
     }
   }
 

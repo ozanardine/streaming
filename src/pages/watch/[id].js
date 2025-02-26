@@ -8,6 +8,7 @@ import FavoriteButton from '../../components/FavoriteButton'
 import { getMediaDetails } from '../../lib/mediaStorage'
 import { supabase } from '../../lib/supabase'
 import dynamic from 'next/dynamic'
+import { getVideoUrlType } from '../../lib/videoHelpers'
 
 // Importar o VideoPlayer sem SSR
 const VideoPlayer = dynamic(() => import('../../components/VideoPlayer'), { 
@@ -28,6 +29,7 @@ export default function WatchPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [relatedMedia, setRelatedMedia] = useState([])
+  const [videoType, setVideoType] = useState('standard')
 
   useEffect(() => {
     const fetchMedia = async () => {
@@ -37,27 +39,44 @@ export default function WatchPage() {
         // Buscar detalhes da mídia
         const mediaData = await getMediaDetails(id)
         
-        // Buscar progresso de visualização
-        const { data: progressData } = await supabase
-          .from('watch_progress')
-          .select('*')
-          .eq('media_id', id)
-          .eq('profile_id', profile.id)
-          .single()
+        // Determinar o tipo de vídeo
+        const detectedType = mediaData.type || getVideoUrlType(mediaData.media_url)
+        setVideoType(detectedType)
         
         setMedia(mediaData)
-        setProgress(progressData?.progress || 0)
+        
+        // Buscar progresso de visualização
+        try {
+          const { data: progressData } = await supabase
+            .from('watch_progress')
+            .select('*')
+            .eq('media_id', id)
+            .eq('profile_id', profile.id)
+            .maybeSingle()
+          
+          if (progressData) {
+            setProgress(progressData.progress || 0)
+          }
+        } catch (progressError) {
+          console.error('Aviso: Erro ao buscar progresso:', progressError)
+          // Continuar mesmo com erro de progresso
+        }
         
         // Buscar mídia relacionada (mesma categoria)
-        if (mediaData.category) {
-          const { data: relatedData } = await supabase
-            .from('media')
-            .select('*')
-            .eq('category', mediaData.category)
-            .neq('id', id)
-            .limit(4)
-            
-          setRelatedMedia(relatedData || [])
+        try {
+          if (mediaData.category) {
+            const { data: relatedData } = await supabase
+              .from('media')
+              .select('*')
+              .eq('category', mediaData.category)
+              .neq('id', id)
+              .limit(4)
+              
+            setRelatedMedia(relatedData || [])
+          }
+        } catch (relatedError) {
+          console.error('Aviso: Erro ao buscar mídia relacionada:', relatedError)
+          // Continuar mesmo com erro em mídia relacionada
         }
       } catch (err) {
         console.error('Erro ao buscar detalhes:', err)
@@ -117,6 +136,7 @@ export default function WatchPage() {
             mediaUrl={media.media_url} 
             mediaId={media.id} 
             initialProgress={progress}
+            videoType={videoType}
           />
         </div>
         
@@ -158,6 +178,7 @@ export default function WatchPage() {
                           alt={item.title} 
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-300"
+                          unoptimized={true}
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center p-2 text-xs text-center text-text-secondary">
