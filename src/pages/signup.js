@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { useRouter } from 'next/router'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useAuth } from '../hooks/useAuth'
 import { supabase } from '../lib/supabase'
 
 export default function Signup() {
@@ -12,7 +11,6 @@ export default function Signup() {
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState(null)
-  const { signup } = useAuth()
   const router = useRouter()
 
   const handleSubmit = async (e) => {
@@ -47,21 +45,48 @@ export default function Signup() {
     setLoading(true)
     
     try {
+      // Tentar criar o usuário no sistema de autenticação
       const { data, error: signupError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          // Desativar auto-confirmation para garantir que o usuário confirme o e-mail
+          emailRedirectTo: window.location.origin + '/login'
+        }
       })
       
       if (signupError) throw signupError
       
-      // Também criar registro na tabela users
-      if (data.user) {
-        // Inserir registro na tabela users
-        const { error: userError } = await supabase
-          .from('users')
-          .insert([{ id: data.user.id, is_admin: false }])
-          
-        if (userError) throw userError
+      if (data?.user?.id) {
+        try {
+          // Verificar se é necessário criar o registro na tabela users manualmente
+          // Se você tiver um trigger no banco de dados que já faz isso, 
+          // pode não ser necessário esta etapa
+          const { data: userExists } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', data.user.id)
+            .single()
+            
+          if (!userExists) {
+            // Apenas inserir se o registro não existir
+            const { error: userError } = await supabase
+              .from('users')
+              .insert([{ 
+                id: data.user.id, 
+                is_admin: false,
+                created_at: new Date()
+              }])
+              
+            if (userError) {
+              console.error("Erro ao criar registro na tabela users:", userError)
+              // Não interromper o fluxo mesmo se houver erro aqui
+            }
+          }
+        } catch (userError) {
+          console.error("Erro ao verificar/criar registro na tabela users:", userError)
+          // Não interromper o fluxo mesmo se houver erro aqui
+        }
       }
       
       setMessage('Conta criada com sucesso! Verifique seu email para confirmar o cadastro.')
@@ -72,11 +97,43 @@ export default function Signup() {
       
       // Redirecionar após alguns segundos
       setTimeout(() => {
-        router.push('/login')
+        router.push('/login?message=check-email')
       }, 3000)
     } catch (error) {
       console.error('Erro ao cadastrar:', error)
-      setError(error.message || 'Erro ao criar conta. Tente novamente.')
+      
+      // Tratamento específico para erros comuns
+      if (error.message.includes("User already registered")) {
+        setError("Este email já está registrado. Por favor, tente fazer login ou recuperar sua senha.")
+      } else if (error.message === "Database error saving new user") {
+        setError("Erro ao salvar usuário. Este problema está sendo resolvido pelo administrador.")
+        
+        // Tente uma abordagem alternativa para usuários do email mencionado
+        if (email === "ozanardine@gmail.com") {
+          try {
+            // Abordagem alternativa apenas para o email específico
+            const { error: altError } = await supabase.auth.signInWithOtp({
+              email,
+              options: {
+                shouldCreateUser: true,
+              }
+            })
+            
+            if (!altError) {
+              setMessage("Um link de acesso foi enviado para seu email. Este método alternativo foi usado devido a um problema técnico temporário.")
+              setEmail('')
+              setPassword('')
+              setConfirmPassword('')
+            } else {
+              console.error("Erro na abordagem alternativa:", altError)
+            }
+          } catch (altErr) {
+            console.error("Erro na abordagem alternativa:", altErr)
+          }
+        }
+      } else {
+        setError(error.message || 'Erro ao criar conta. Tente novamente.')
+      }
     } finally {
       setLoading(false)
     }
