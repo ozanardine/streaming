@@ -11,6 +11,18 @@ export const uploadToSupabase = async (file, folder = 'videos') => {
     .from('media')
     .upload(filePath, file)
 
+  // Validar tipo de arquivo para thumbnails
+  if (folder === 'thumbnails') {
+    const validTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!validTypes.includes(file.type)) {
+      throw new Error('Formato de arquivo inválido. Use JPEG, PNG, WebP ou GIF.')
+    }
+    
+    if (file.size > 5 * 1024 * 1024) { // 5MB 
+      throw new Error('Arquivo muito grande. O tamanho máximo é 5MB.')
+    }
+  }
+
   if (error) {
     throw error
   }

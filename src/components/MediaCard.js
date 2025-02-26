@@ -15,8 +15,13 @@ const MediaCard = ({ media }) => {
               src={media.thumbnail_url} 
               alt={media.title} 
               fill
+              unoptimized={true} // Adicione esta propriedade
               sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
               className="object-cover"
+              onError={(e) => {
+                // Fallback para quando a imagem falhar
+                e.target.src = '/images/default-avatar.png'
+              }}
             />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center p-4 text-sm text-center text-text-secondary">

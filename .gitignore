@@ -1,1 +1,8 @@
 EMAIL TEMPLATE.html
+supabase
+
+.vscode
+node_modules
+
+database_roles.sql
+database_structure.sql
