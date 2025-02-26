@@ -1,6 +1,6 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react'
 import MediaCard from './MediaCard'
-import { useInView } from 'react-intersection-observer'; // You'll need to install this package
+import { useInView } from 'react-intersection-observer';
 
 const CategoryRow = ({ title, media = [] }) => {
   const rowRef = useRef(null);
