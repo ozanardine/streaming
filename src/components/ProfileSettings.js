@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
-import Image from 'next/image'
 import { useRouter } from 'next/router'
 import { supabase } from '../lib/supabase'
 import { useProfiles } from '../hooks/useProfiles'
 import { useAuth } from '../hooks/useAuth'
+import SafeImage from './SafeImage'
 
 const avatarOptions = [
   '/images/avatars/avatar1.png',
