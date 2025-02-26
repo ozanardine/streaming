@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useAuth } from '../../../hooks/useAuth'
 import Layout from '../../../components/Layout'
 import { uploadToSupabase } from '../../../lib/mediaStorage'
+import { formatExternalUrl, getVideoUrlType, extractYouTubeId } from '../../../lib/videoHelpers'
 import { supabase } from '../../../lib/supabase'
 import Image from 'next/image'
 
@@ -17,8 +18,10 @@ export default function EditMediaPage() {
   const [category, setCategory] = useState('')
   const [isExternal, setIsExternal] = useState(false)
   const [externalUrl, setExternalUrl] = useState('')
+  const [externalUrlType, setExternalUrlType] = useState('')
   const [thumbnailUrl, setThumbnailUrl] = useState('')
   const [thumbnailFile, setThumbnailFile] = useState(null)
+  const [thumbnailPreview, setThumbnailPreview] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -57,10 +60,28 @@ export default function EditMediaPage() {
         setCategory(data.category || '')
         setThumbnailUrl(data.thumbnail_url || '')
         
+        // Verificar tipo de URL
+        const mediaType = data.type || 
+            (data.media_url.includes('youtube.com') || data.media_url.includes('youtu.be') ? 'youtube' :
+             data.media_url.includes('drive.google.com') ? 'drive' : 'external');
+        
         // Determinar se é URL externa
-        if (data.media_url && !data.media_url.includes('supabase')) {
+        if (mediaType === 'youtube' || mediaType === 'drive' || mediaType === 'external') {
           setIsExternal(true)
-          setExternalUrl(data.media_url)
+          
+          // Para URLs do YouTube, tentar converter URL de incorporação de volta para URL padrão para exibição
+          if (mediaType === 'youtube' && data.media_url.includes('/embed/')) {
+            const videoId = data.media_url.split('/embed/')[1]?.split('?')[0];
+            if (videoId) {
+              setExternalUrl(`https://youtu.be/${videoId}`);
+            } else {
+              setExternalUrl(data.media_url);
+            }
+          } else {
+            setExternalUrl(data.media_url);
+          }
+          
+          setExternalUrlType(mediaType);
         }
       } catch (err) {
         console.error('Erro ao carregar mídia:', err)
@@ -72,6 +93,22 @@ export default function EditMediaPage() {
     
     fetchMedia()
   }, [id, user, isAdmin, router])
+
+  // Atualizar tipo de URL externa quando a URL mudar
+  useEffect(() => {
+    if (externalUrl) {
+      const type = getVideoUrlType(externalUrl);
+      setExternalUrlType(type);
+      
+      // Para vídeos do YouTube, tentar obter thumbnail automaticamente se não houver
+      if (type === 'youtube' && !thumbnailUrl && !thumbnailFile) {
+        const videoId = extractYouTubeId(externalUrl);
+        if (videoId) {
+          setThumbnailUrl(`https://img.youtube.com/vi/${videoId}/hqdefault.jpg`);
+        }
+      }
+    }
+  }, [externalUrl, thumbnailFile]);
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -89,8 +126,18 @@ export default function EditMediaPage() {
       let thumbUrl = thumbnailUrl
       
       // Se mudou para URL externa
-      if (isExternal && externalUrl && externalUrl !== media.media_url) {
-        mediaUrl = externalUrl
+      if (isExternal && externalUrl) {
+        // Não atualizar se a URL não foi alterada (para URLs do YouTube, verificar o ID do vídeo)
+        if (externalUrlType === 'youtube') {
+          const oldVideoId = extractYouTubeId(media.media_url);
+          const newVideoId = extractYouTubeId(externalUrl);
+          
+          if (oldVideoId !== newVideoId) {
+            mediaUrl = formatExternalUrl(externalUrl, externalUrlType);
+          }
+        } else if (externalUrl !== media.media_url) {
+          mediaUrl = formatExternalUrl(externalUrl, externalUrlType);
+        }
       }
       
       // Upload de nova thumbnail se fornecida
@@ -98,6 +145,12 @@ export default function EditMediaPage() {
         const thumbResult = await uploadToSupabase(thumbnailFile, 'thumbnails')
         thumbUrl = thumbResult.url
       }
+      
+      // Determinar o tipo de mídia
+      const mediaType = isExternal
+          ? (externalUrlType === 'youtube' ? 'youtube' : 
+             externalUrlType === 'drive' ? 'drive' : 'external')
+          : 'uploaded';
       
       // Atualizar informações no banco de dados
       const { data, error: dbError } = await supabase
@@ -108,6 +161,7 @@ export default function EditMediaPage() {
           category,
           media_url: mediaUrl,
           thumbnail_url: thumbUrl,
+          type: mediaType,
           updated_at: new Date()
         })
         .eq('id', id)
@@ -135,6 +189,13 @@ export default function EditMediaPage() {
     const file = e.target.files[0]
     if (file) {
       setThumbnailFile(file)
+      
+      // Criar preview
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setThumbnailPreview(event.target.result)
+      }
+      reader.readAsDataURL(file)
     }
   }
 
@@ -258,9 +319,18 @@ export default function EditMediaPage() {
                   required={isExternal}
                   placeholder="https://drive.google.com/file/d/..."
                 />
-                <p className="mt-1 text-xs text-text-secondary">
-                  Para Google Drive, certifique-se de que o link permita acesso a qualquer pessoa com o link
-                </p>
+                
+                {externalUrlType === 'youtube' && (
+                  <p className="mt-1 text-xs text-green-500">
+                    URL do YouTube detectada! Será convertida automaticamente para formato incorporável.
+                  </p>
+                )}
+                
+                {externalUrlType === 'drive' && (
+                  <p className="mt-1 text-xs text-text-secondary">
+                    Para Google Drive, certifique-se de que o link permita acesso a qualquer pessoa com o link
+                  </p>
+                )}
               </div>
             )}
             
@@ -297,7 +367,18 @@ export default function EditMediaPage() {
               />
             </div>
             
-            {thumbnailUrl && !thumbnailFile && (
+            {thumbnailPreview ? (
+              <div className="mt-2">
+                <p className="text-sm text-text-secondary mb-2">Nova miniatura:</p>
+                <div className="w-48 h-27 relative rounded overflow-hidden">
+                  <img 
+                    src={thumbnailPreview}
+                    alt="Nova miniatura"
+                    className="object-cover w-full h-full"
+                  />
+                </div>
+              </div>
+            ) : thumbnailUrl ? (
               <div className="mt-2">
                 <p className="text-sm text-text-secondary mb-2">Miniatura atual:</p>
                 <div className="w-48 h-27 relative rounded overflow-hidden">
@@ -307,10 +388,11 @@ export default function EditMediaPage() {
                     width={200}
                     height={112}
                     className="object-cover"
+                    unoptimized
                   />
                 </div>
               </div>
-            )}
+            ) : null}
             
             <div className="flex space-x-4 pt-4">
               <button 

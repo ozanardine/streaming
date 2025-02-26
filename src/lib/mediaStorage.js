@@ -89,31 +89,82 @@ export const getMediaList = async (category = null) => {
 
 // Função para obter detalhes de uma mídia específica
 export const getMediaDetails = async (id) => {
-  const { data, error } = await supabase
-    .from('media')
-    .select('*')
-    .eq('id', id)
-    .single()
-  
-  if (error) throw error
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('media')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) throw error
+    return data
+  } catch (error) {
+    console.error('Erro ao buscar detalhes da mídia:', error)
+    throw error
+  }
 }
 
 // Função para atualizar o progresso de visualização
 export const updateWatchProgress = async (mediaId, profileId, progress, duration) => {
-  const { data, error } = await supabase
-    .from('watch_progress')
-    .upsert([
-      { 
-        media_id: mediaId,
-        profile_id: profileId,
-        progress,
-        duration,
-        last_watched: new Date()
-      }
-    ])
-    .select()
-  
-  if (error) throw error
-  return data[0]
+  try {
+    // Verificar se o registro já existe
+    const { data: existingData, error: checkError } = await supabase
+      .from('watch_progress')
+      .select('id')
+      .eq('media_id', mediaId)
+      .eq('profile_id', profileId)
+      .maybeSingle()
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 é o código para "não encontrado", que é esperado se não houver registro
+      throw checkError
+    }
+    
+    let result;
+    
+    if (existingData) {
+      // Atualizar registro existente
+      const { data, error } = await supabase
+        .from('watch_progress')
+        .update({
+          progress,
+          duration,
+          last_watched: new Date()
+        })
+        .eq('id', existingData.id)
+        .select()
+      
+      if (error) throw error
+      result = data[0]
+    } else {
+      // Inserir novo registro
+      const { data, error } = await supabase
+        .from('watch_progress')
+        .insert([
+          { 
+            media_id: mediaId,
+            profile_id: profileId,
+            progress,
+            duration,
+            last_watched: new Date()
+          }
+        ])
+        .select()
+      
+      if (error) throw error
+      result = data[0]
+    }
+    
+    return result
+  } catch (error) {
+    console.error('Erro ao atualizar progresso de visualização:', error)
+    
+    // Mesmo com erro, não interrompemos a experiência do usuário
+    return { 
+      media_id: mediaId, 
+      profile_id: profileId,
+      progress,
+      duration
+    }
+  }
 }

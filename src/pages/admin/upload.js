@@ -3,6 +3,7 @@ import { useRouter } from 'next/router'
 import { useAuth } from '../../hooks/useAuth'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabase'
+import { formatExternalUrl } from '../../lib/videoHelpers'
 
 export default function UploadPage() {
   const { user, isAdmin } = useAuth()
@@ -10,14 +11,16 @@ export default function UploadPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [category, setCategory] = useState('')
-  const [isExternal, setIsExternal] = useState(false)
+  const [isExternal, setIsExternal] = useState(true)
   const [externalUrl, setExternalUrl] = useState('')
+  const [externalUrlType, setExternalUrlType] = useState('') // 'youtube', 'drive', 'other'
   const [thumbnailUrl, setThumbnailUrl] = useState('')
   const [file, setFile] = useState(null)
   const [thumbnailFile, setThumbnailFile] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [progress, setProgress] = useState(0)
+  const [thumbnailPreview, setThumbnailPreview] = useState(null)
 
   // Verificar se o usuário está autenticado e é admin
   useEffect(() => {
@@ -28,20 +31,67 @@ export default function UploadPage() {
     }
   }, [user, isAdmin, router])
 
-  const [thumbnailPreview, setThumbnailPreview] = useState(null)
+  // Detectar tipo de URL externa
+  useEffect(() => {
+    if (externalUrl) {
+      if (externalUrl.includes('youtube.com') || externalUrl.includes('youtu.be')) {
+        setExternalUrlType('youtube');
+      } else if (externalUrl.includes('drive.google.com')) {
+        setExternalUrlType('drive');
+      } else {
+        setExternalUrlType('other');
+      }
+    } else {
+      setExternalUrlType('');
+    }
+  }, [externalUrl]);
 
-    const handleThumbnailChange = (e) => {
-      const file = e.target.files[0]
-      if (file) {
-        setThumbnailFile(file)
-        // Criar preview
-        const reader = new FileReader()
-        reader.onload = () => {
-          setThumbnailPreview(reader.result)
+  // Verificar e gerar thumbnail automática para vídeos do YouTube
+  useEffect(() => {
+    if (externalUrlType === 'youtube' && !thumbnailUrl && !thumbnailFile) {
+      try {
+        // Extrair ID do vídeo do YouTube
+        const videoId = extractYouTubeId(externalUrl);
+        if (videoId) {
+          // Gerar URL de thumbnail do YouTube
+          const youtubeThumbUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+          setThumbnailUrl(youtubeThumbUrl);
         }
-        reader.readAsDataURL(file)
+      } catch (err) {
+        console.error('Erro ao gerar thumbnail do YouTube:', err);
       }
     }
+  }, [externalUrlType, externalUrl, thumbnailUrl, thumbnailFile]);
+
+  const extractYouTubeId = (url) => {
+    const patterns = [
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([^&]+)/i,
+      /(?:https?:\/\/)?(?:www\.)?youtu\.be\/([^\?]+)/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([^\?]+)/i
+    ];
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+    
+    return null;
+  };
+
+  const handleThumbnailChange = (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      setThumbnailFile(file)
+      // Criar preview
+      const reader = new FileReader()
+      reader.onload = () => {
+        setThumbnailPreview(reader.result)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
 
   // Função para fazer upload de um arquivo para o Supabase Storage
   const uploadFile = async (file, folder = 'videos') => {
@@ -94,8 +144,8 @@ export default function UploadPage() {
           throw new Error('A URL do vídeo é obrigatória')
         }
         
-        // Usar a URL externa diretamente
-        mediaUrl = externalUrl;
+        // Formatar URL externa conforme o tipo
+        mediaUrl = formatExternalUrl(externalUrl, externalUrlType);
         
         // Avançar progresso para feedback visual
         setProgress(50);
@@ -117,6 +167,12 @@ export default function UploadPage() {
       // Avançar progresso para feedback visual
       setProgress(75);
       
+      // Determinar o tipo de mídia
+      const mediaType = isExternal 
+        ? (externalUrlType === 'youtube' ? 'youtube' : 
+           externalUrlType === 'drive' ? 'drive' : 'external')
+        : 'uploaded';
+      
       // Salvar informações no banco de dados
       const { data, error: dbError } = await supabase
         .from('media')
@@ -126,7 +182,7 @@ export default function UploadPage() {
           category,
           media_url: mediaUrl,
           thumbnail_url: thumbUrl,
-          type: isExternal ? 'external' : 'uploaded',
+          type: mediaType,
           added_by: user.id
         }])
         .select()
@@ -234,9 +290,25 @@ export default function UploadPage() {
                   required={isExternal}
                   placeholder="https://youtu.be/exemplo ou https://drive.google.com/file/d/..."
                 />
-                <p className="mt-1 text-xs text-text-secondary">
-                  Para Google Drive, certifique-se de que o link permita acesso a qualquer pessoa com o link
-                </p>
+                
+                {externalUrlType === 'youtube' && (
+                  <p className="mt-1 text-xs text-green-500">
+                    URL do YouTube detectada! Será convertida automaticamente para formato incorporável.
+                    {!thumbnailFile && !thumbnailUrl && " Uma miniatura será gerada automaticamente."}
+                  </p>
+                )}
+                
+                {externalUrlType === 'drive' && (
+                  <p className="mt-1 text-xs text-text-secondary">
+                    URL do Google Drive detectada. Certifique-se de que o link permita acesso a qualquer pessoa com o link.
+                  </p>
+                )}
+                
+                {externalUrlType === 'other' && (
+                  <p className="mt-1 text-xs text-yellow-500">
+                    URL externa genérica. Certifique-se de que é um link direto para um arquivo de vídeo (MP4, WebM, etc).
+                  </p>
+                )}
               </div>
             ) : (
               <div>
@@ -265,7 +337,7 @@ export default function UploadPage() {
             
             <div>
               <label htmlFor="thumbnailUrl" className="block text-sm font-medium text-text-secondary mb-1">
-                URL da Miniatura (opcional)
+                URL da Miniatura {externalUrlType === 'youtube' && !thumbnailFile ? "(preenchido automaticamente)" : "(opcional)"}
               </label>
               <input
                 id="thumbnailUrl"
@@ -302,6 +374,19 @@ export default function UploadPage() {
                     <img 
                       src={thumbnailPreview}
                       alt="Thumbnail preview"
+                      className="object-cover w-full h-full"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {thumbnailUrl && !thumbnailFile && externalUrlType === 'youtube' && (
+                <div className="mt-2">
+                  <p className="text-sm text-text-secondary mb-1">Thumbnail do YouTube:</p>
+                  <div className="w-48 h-27 relative rounded overflow-hidden">
+                    <img 
+                      src={thumbnailUrl}
+                      alt="YouTube thumbnail"
                       className="object-cover w-full h-full"
                     />
                   </div>

@@ -15,12 +15,13 @@ const FavoriteButton = ({ mediaId }) => {
       }
       
       try {
+        // Verificar se o item está nos favoritos
         const { data, error } = await supabase
           .from('favorites')
           .select('id')
           .eq('profile_id', profile.id)
           .eq('media_id', mediaId)
-          .single()
+          .maybeSingle()
           
         if (error && error.code !== 'PGRST116') {
           // PGRST116 é o código para "não encontrado", que é esperado se não for favorito
@@ -68,7 +69,13 @@ const FavoriteButton = ({ mediaId }) => {
       }
     } catch (err) {
       console.error('Erro ao atualizar favorito:', err)
-      alert('Não foi possível atualizar favorito. Tente novamente.')
+      // Interface mais amigável - feedback visual em vez de alerta
+      const message = isFavorite 
+        ? 'Não foi possível remover dos favoritos. Tente novamente.' 
+        : 'Não foi possível adicionar aos favoritos. Tente novamente.';
+      
+      // Opcionalmente, você pode mostrar um toast/notification em vez de um alert
+      console.error(message);
     }
   }
 
@@ -78,6 +85,7 @@ const FavoriteButton = ({ mediaId }) => {
       onClick={toggleFavorite}
       disabled={loading}
       title={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
+      aria-label={isFavorite ? 'Remover dos favoritos' : 'Adicionar aos favoritos'}
     >
       {isFavorite ? (
         <svg className="w-6 h-6 fill-current text-primary" viewBox="0 0 24 24">
