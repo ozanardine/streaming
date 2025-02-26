@@ -4,6 +4,7 @@ import Image from 'next/image'
 import { useRouter } from 'next/router'
 import { useAuth } from '../hooks/useAuth'
 import { useProfiles } from '../hooks/useProfiles'
+import SafeImage from './SafeImage'
 
 const Navbar = () => {
   const { user, profile, logout, setCurrentProfile, isAdmin } = useAuth()
