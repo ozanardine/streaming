@@ -1,10 +1,25 @@
-import React, { useRef } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import MediaCard from './MediaCard'
+import { useInView } from 'react-intersection-observer'; // You'll need to install this package
 
 const CategoryRow = ({ title, media = [] }) => {
-  const rowRef = useRef(null)
-
-  const scroll = (direction) => {
+  const rowRef = useRef(null);
+  const [isVisible, setIsVisible] = useState(false);
+  
+  // Use Intersection Observer to lazy load rows
+  const { ref: observerRef, inView } = useInView({
+    threshold: 0.1,
+    triggerOnce: true,
+  });
+  
+  // Set visibility when row comes into view
+  useEffect(() => {
+    if (inView) {
+      setIsVisible(true);
+    }
+  }, [inView]);
+  
+  const scroll = useCallback((direction) => {
     if (rowRef.current) {
       const { scrollLeft, clientWidth } = rowRef.current
       const scrollTo = direction === 'left' 
@@ -16,14 +31,14 @@ const CategoryRow = ({ title, media = [] }) => {
         behavior: 'smooth'
       })
     }
-  }
+  }, []);
 
   if (!media.length) {
     return null
   }
 
   return (
-    <div className="mb-10">
+    <div className="mb-10" ref={observerRef}>
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-bold">{title}</h2>
       </div>
@@ -46,9 +61,16 @@ const CategoryRow = ({ title, media = [] }) => {
           ref={rowRef}
           style={{ scrollbarWidth: 'none' }}
         >
-          {media.map(item => (
+          {isVisible && media.map(item => (
             <div key={item.id} className="flex-shrink-0 w-60 md:w-64">
               <MediaCard media={item} />
+            </div>
+          ))}
+          
+          {!isVisible && media.map((item, i) => (
+            <div key={i} className="flex-shrink-0 w-60 md:w-64">
+              <div className="aspect-video bg-background-dark animate-pulse rounded-md"></div>
+              <div className="mt-2 h-4 bg-background-dark animate-pulse rounded-md"></div>
             </div>
           ))}
         </div>
@@ -69,4 +91,4 @@ const CategoryRow = ({ title, media = [] }) => {
   )
 }
 
-export default CategoryRow
+export default CategoryRow;

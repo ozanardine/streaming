@@ -1,33 +1,34 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState, useCallback, memo } from 'react'
 import { updateWatchProgress } from '../lib/mediaStorage'
 import { useAuth } from '../hooks/useAuth'
 import { extractYouTubeId, formatGoogleDriveUrl } from '../lib/videoHelpers'
 
-// Componente separado para o Player do YouTube
-const YouTubePlayer = ({ videoId, initialProgress, onTimeUpdate, onPlayerReady }) => {
+// Separate YouTubePlayer into a memoized component to prevent unnecessary re-renders
+const YouTubePlayer = memo(({ videoId, initialProgress, onTimeUpdate, onPlayerReady, onError }) => {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
+  const intervalRef = useRef(null);
   
   useEffect(() => {
-    // Função para inicializar o player do YouTube
+    // Function to initialize the YouTube player
     const loadYouTubePlayer = () => {
       if (!window.YT) {
-        // Carregar a API do YouTube se ainda não estiver disponível
+        // Load the YouTube API if not already available
         const tag = document.createElement('script');
         tag.src = 'https://www.youtube.com/iframe_api';
         const firstScript = document.getElementsByTagName('script')[0];
         firstScript.parentNode.insertBefore(tag, firstScript);
         
-        // Configurar callback global para quando a API estiver pronta
+        // Set up global callback for when API is ready
         window.onYouTubeIframeAPIReady = initPlayer;
       } else {
         initPlayer();
       }
     };
     
-    // Inicializar o player quando a API estiver pronta
+    // Initialize the player when API is ready
     const initPlayer = () => {
-      // Verificar se o player já foi inicializado ou se o container não existe
+      // Check if player was already initialized or container doesn't exist
       if (playerRef.current || !containerRef.current) return;
       
       try {
@@ -51,23 +52,35 @@ const YouTubePlayer = ({ videoId, initialProgress, onTimeUpdate, onPlayerReady }
               }
             },
             onStateChange: (event) => {
-              // Quando o vídeo está em reprodução, começar a monitorar o tempo
+              // When video is playing, start monitoring time
               if (event.data === window.YT.PlayerState.PLAYING) {
                 startTimeTracking();
+              } else if (event.data === window.YT.PlayerState.PAUSED || 
+                        event.data === window.YT.PlayerState.ENDED) {
+                stopTimeTracking();
+              }
+            },
+            onError: (event) => {
+              console.error('YouTube player error:', event.data);
+              if (typeof onError === 'function') {
+                onError(event.data);
               }
             }
           }
         });
       } catch (error) {
-        console.error('Erro ao inicializar player do YouTube:', error);
+        console.error('Error initializing YouTube player:', error);
+        if (typeof onError === 'function') {
+          onError(error);
+        }
       }
     };
     
-    // Acompanhar o tempo de reprodução do YouTube
+    // Time tracking for YouTube
     const startTimeTracking = () => {
-      if (!playerRef.current) return;
+      stopTimeTracking(); // Clear any existing interval first
       
-      const interval = setInterval(() => {
+      intervalRef.current = setInterval(() => {
         try {
           if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
             const currentTime = playerRef.current.getCurrentTime();
@@ -76,189 +89,227 @@ const YouTubePlayer = ({ videoId, initialProgress, onTimeUpdate, onPlayerReady }
             }
           }
         } catch (e) {
-          console.error('Erro ao obter tempo do YouTube:', e);
+          console.error('Error getting time from YouTube:', e);
+          stopTimeTracking();
         }
       }, 1000);
-      
-      return () => clearInterval(interval);
+    };
+    
+    const stopTimeTracking = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
     
     loadYouTubePlayer();
     
+    // Cleanup function
     return () => {
+      stopTimeTracking();
       if (playerRef.current && typeof playerRef.current.destroy === 'function') {
         playerRef.current.destroy();
         playerRef.current = null;
       }
     };
-  }, [videoId, initialProgress, onTimeUpdate, onPlayerReady]);
+  }, [videoId, initialProgress, onTimeUpdate, onPlayerReady, onError]);
 
   return <div ref={containerRef} className="w-full h-full" />;
-};
+});
 
+YouTubePlayer.displayName = 'YouTubePlayer';
+
+// Main VideoPlayer component with better error handling and performance optimizations
 const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'standard' }) => {
   const videoRef = useRef(null);
   const playerRef = useRef(null);
+  const saveProgressTimerRef = useRef(null);
   const { profile } = useAuth();
   const [loaded, setLoaded] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(initialProgress);
   const [playerType, setPlayerType] = useState('standard'); // 'standard', 'youtube', 'drive'
   const [youtubeId, setYoutubeId] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Detectar tipo de vídeo
+  // Detect video type and extract info
   useEffect(() => {
-    // Priorizar o videoType fornecido como prop
-    if (videoType === 'youtube' || videoType === 'drive') {
-      setPlayerType(videoType);
-    } else if (mediaUrl) {
-      // Detectar baseado na URL
-      if (mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be')) {
-        setPlayerType('youtube');
-        
-        // Extrair ID do vídeo do YouTube
-        const id = extractYouTubeId(mediaUrl);
-        if (id) {
-          setYoutubeId(id);
+    const detectVideoType = () => {
+      // Prioritize the provided videoType
+      if (videoType === 'youtube' || videoType === 'drive') {
+        setPlayerType(videoType);
+      } else if (mediaUrl) {
+        // Auto-detect based on URL
+        if (mediaUrl.includes('youtube.com') || mediaUrl.includes('youtu.be')) {
+          setPlayerType('youtube');
+          
+          // Extract YouTube video ID
+          const id = extractYouTubeId(mediaUrl);
+          if (id) {
+            setYoutubeId(id);
+          } else {
+            setError('URL do YouTube inválida');
+          }
+        } else if (mediaUrl.includes('drive.google.com')) {
+          setPlayerType('drive');
+        } else {
+          setPlayerType('standard');
         }
-      } else if (mediaUrl.includes('drive.google.com')) {
-        setPlayerType('drive');
-      } else {
-        setPlayerType('standard');
       }
-    }
+      
+      setLoading(false);
+    };
+
+    detectVideoType();
   }, [mediaUrl, videoType]);
 
-  // Extrair ID do YouTube quando player type for 'youtube'
-  useEffect(() => {
-    if (playerType === 'youtube' && mediaUrl && !youtubeId) {
-      const id = extractYouTubeId(mediaUrl);
-      if (id) {
-        setYoutubeId(id);
-      } else {
-        console.error('Não foi possível extrair ID do YouTube da URL:', mediaUrl);
-      }
-    }
-  }, [playerType, mediaUrl, youtubeId]);
-
-  // Inicializar o player padrão para vídeos não-YouTube
-  useEffect(() => {
-    if ((playerType === 'standard' || playerType === 'drive') && 
-        typeof window !== 'undefined' && 
-        videoRef.current && 
-        !playerRef.current) {
-      
-      const initializePlayer = async () => {
-        try {
-          // Importação dinâmica do Plyr
-          const Plyr = (await import('plyr')).default;
-          await import('plyr/dist/plyr.css');
-          
-          // Configurações do Plyr
-          playerRef.current = new Plyr(videoRef.current, {
-            captions: { active: true },
-            quality: { default: 720, options: [4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
-            controls: [
-              'play-large', 'play', 'progress', 'current-time', 'duration',
-              'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
-            ],
-            keyboard: { focused: true, global: true },
-            tooltips: { controls: true, seek: true },
-            i18n: {
-              restart: 'Reiniciar',
-              rewind: 'Voltar {seektime}s',
-              play: 'Reproduzir',
-              pause: 'Pausar',
-              fastForward: 'Avançar {seektime}s',
-              seek: 'Buscar',
-              seekLabel: '{currentTime} de {duration}',
-              played: 'Reproduzido',
-              buffered: 'Carregado',
-              currentTime: 'Tempo atual',
-              duration: 'Duração',
-              volume: 'Volume',
-              mute: 'Mudo',
-              unmute: 'Ativar som',
-              enableCaptions: 'Ativar legendas',
-              disableCaptions: 'Desativar legendas',
-              download: 'Download',
-              enterFullscreen: 'Entrar em tela cheia',
-              exitFullscreen: 'Sair da tela cheia',
-              frameTitle: 'Player para {title}',
-              captions: 'Legendas',
-              settings: 'Configurações',
-              pip: 'PIP',
-              menuBack: 'Voltar ao menu anterior',
-              speed: 'Velocidade',
-              normal: 'Normal',
-              quality: 'Qualidade',
-              loop: 'Loop',
-              start: 'Início',
-              end: 'Fim',
-              all: 'Tudo',
-              reset: 'Reiniciar',
-              disabled: 'Desativado',
-              enabled: 'Ativado',
-              advertisement: 'Anúncio',
-              qualityBadge: {
-                2160: '4K',
-                1440: 'HD',
-                1080: 'HD',
-                720: 'HD',
-                576: 'SD',
-                480: 'SD'
-              }
-            }
-          });
-          
-          // Obter duração quando disponível
-          playerRef.current.on('loadedmetadata', () => {
-            setDuration(playerRef.current.duration || 0);
-          });
-          
-          // Atualizar tempo atual
-          playerRef.current.on('timeupdate', () => {
-            setCurrentTime(playerRef.current.currentTime || 0);
-          });
-          
-          // Carregar o progresso inicial
-          if (initialProgress > 0 && playerRef.current) {
-            playerRef.current.once('canplay', () => {
-              playerRef.current.currentTime = initialProgress;
-            });
-          }
-          
-          setLoaded(true);
-        } catch (error) {
-          console.error('Erro ao inicializar player:', error);
-        }
-      };
-
-      initializePlayer();
-    }
+  // Initialize standard player for non-YouTube videos
+  const initializeStandardPlayer = useCallback(async () => {
+    if (typeof window === 'undefined' || !videoRef.current || playerRef.current) return;
     
-    return () => {
-      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
-        playerRef.current.destroy();
-        playerRef.current = null;
-      }
-    };
-  }, [videoRef, initialProgress, playerType]);
+    try {
+      setLoading(true);
+      // Dynamic import of Plyr
+      const Plyr = (await import('plyr')).default;
+      await import('plyr/dist/plyr.css');
+      
+      // Configure player
+      playerRef.current = new Plyr(videoRef.current, {
+        captions: { active: true },
+        quality: { default: 720, options: [4320, 2880, 2160, 1440, 1080, 720, 576, 480, 360, 240] },
+        controls: [
+          'play-large', 'play', 'progress', 'current-time', 'duration',
+          'mute', 'volume', 'captions', 'settings', 'pip', 'airplay', 'fullscreen'
+        ],
+        keyboard: { focused: true, global: true },
+        seekTime: 10,
+        tooltips: { controls: true, seek: true },
+        i18n: {
+          restart: 'Reiniciar',
+          rewind: 'Voltar {seektime}s',
+          play: 'Reproduzir',
+          pause: 'Pausar',
+          fastForward: 'Avançar {seektime}s',
+          seek: 'Buscar',
+          seekLabel: '{currentTime} de {duration}',
+          played: 'Reproduzido',
+          buffered: 'Carregado',
+          currentTime: 'Tempo atual',
+          duration: 'Duração',
+          volume: 'Volume',
+          mute: 'Mudo',
+          unmute: 'Ativar som',
+          enableCaptions: 'Ativar legendas',
+          disableCaptions: 'Desativar legendas',
+          download: 'Download',
+          enterFullscreen: 'Entrar em tela cheia',
+          exitFullscreen: 'Sair da tela cheia',
+          frameTitle: 'Player para {title}',
+          captions: 'Legendas',
+          settings: 'Configurações',
+          pip: 'PIP',
+          menuBack: 'Voltar ao menu anterior',
+          speed: 'Velocidade',
+          normal: 'Normal',
+          quality: 'Qualidade',
+          loop: 'Loop',
+          start: 'Início',
+          end: 'Fim',
+          all: 'Tudo',
+          reset: 'Reiniciar',
+          disabled: 'Desativado',
+          enabled: 'Ativado',
+          advertisement: 'Anúncio',
+          qualityBadge: {
+            2160: '4K',
+            1440: 'HD',
+            1080: 'HD',
+            720: 'HD',
+            576: 'SD',
+            480: 'SD'
+          }
+        }
+      });
+      
+      // Event handlers
+      playerRef.current.on('loadedmetadata', () => {
+        setDuration(playerRef.current.duration || 0);
+        // Set initial progress if provided
+        if (initialProgress > 0 && playerRef.current) {
+          playerRef.current.currentTime = initialProgress;
+        }
+        setLoaded(true);
+        setLoading(false);
+      });
+      
+      playerRef.current.on('timeupdate', () => {
+        setCurrentTime(playerRef.current.currentTime || 0);
+      });
+      
+      playerRef.current.on('error', (event) => {
+        console.error('Player error:', event);
+        setError('Erro ao reproduzir vídeo. Tente novamente.');
+        setLoading(false);
+      });
+      
+    } catch (error) {
+      console.error('Error initializing player:', error);
+      setError('Não foi possível inicializar o player de vídeo.');
+      setLoading(false);
+    }
+  }, [initialProgress]);
 
-  // Manipuladores para o player do YouTube
+  useEffect(() => {
+    if ((playerType === 'standard' || playerType === 'drive') && videoRef.current && !playerRef.current) {
+      initializeStandardPlayer();
+    }
+  }, [playerType, videoRef, initializeStandardPlayer]);
+
+  // Handlers for YouTube player
   const handleYouTubePlayerReady = (player) => {
     setDuration(player.getDuration() || 0);
+    setLoading(false);
+    setLoaded(true);
   };
   
   const handleYouTubeTimeUpdate = (time) => {
     setCurrentTime(time || 0);
   };
+  
+  const handleYouTubeError = (errorCode) => {
+    // Handle different YouTube error codes
+    let errorMessage = 'Erro ao reproduzir vídeo do YouTube.';
+    switch(errorCode) {
+      case 2:
+        errorMessage = 'Parâmetro inválido na URL do YouTube.';
+        break;
+      case 5:
+        errorMessage = 'Erro de HTML5 player do YouTube.';
+        break;
+      case 100:
+        errorMessage = 'Vídeo não encontrado ou foi removido.';
+        break;
+      case 101:
+      case 150:
+        errorMessage = 'O proprietário do vídeo não permite que ele seja reproduzido em players incorporados.';
+        break;
+    }
+    setError(errorMessage);
+    setLoading(false);
+  };
 
-  // Salvar progresso a cada 10 segundos
+  // Save progress periodically
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const saveProgressInterval = setInterval(() => {
+    // Clear any existing timer
+    if (saveProgressTimerRef.current) {
+      clearInterval(saveProgressTimerRef.current);
+    }
+    
+    // Set new timer to save progress every 10 seconds
+    saveProgressTimerRef.current = setInterval(() => {
       if (profile?.id && currentTime > 0 && duration > 0) {
         updateWatchProgress(mediaId, profile.id, currentTime, duration)
           .catch(err => console.error('Erro ao salvar progresso:', err));
@@ -266,11 +317,13 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
     }, 10000);
 
     return () => {
-      clearInterval(saveProgressInterval);
+      if (saveProgressTimerRef.current) {
+        clearInterval(saveProgressTimerRef.current);
+      }
     };
   }, [mediaId, profile?.id, currentTime, duration]);
 
-  // Evento de salvamento ao sair/pausar
+  // Save progress when leaving/pausing
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
@@ -289,32 +342,79 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
     };
   }, [mediaId, profile?.id, currentTime, duration]);
 
-  // Determinar que URL usar para vídeos padrão
-  const getVideoSource = () => {
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (playerRef.current && typeof playerRef.current.destroy === 'function') {
+        playerRef.current.destroy();
+        playerRef.current = null;
+      }
+      
+      if (saveProgressTimerRef.current) {
+        clearInterval(saveProgressTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Get the correct video source URL
+  const getVideoSource = useCallback(() => {
     if (playerType === 'drive' && mediaUrl) {
       return formatGoogleDriveUrl(mediaUrl);
     }
     return mediaUrl;
-  };
+  }, [playerType, mediaUrl]);
+
+  // Show loading state
+  if (loading) {
+    return (
+      <div className="aspect-video bg-black rounded-lg shadow-lg overflow-hidden relative flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="aspect-video bg-black rounded-lg shadow-lg overflow-hidden relative flex items-center justify-center">
+        <div className="text-center p-4">
+          <div className="text-red-500 mb-2">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <p className="text-white">{error}</p>
+          <button 
+            className="mt-4 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
+            onClick={() => window.location.reload()}
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="aspect-video bg-black rounded-lg shadow-lg overflow-hidden relative">
       {playerType === 'youtube' && youtubeId ? (
-        // Renderizar player do YouTube
+        // Render YouTube player
         <YouTubePlayer 
           videoId={youtubeId} 
           initialProgress={initialProgress}
           onTimeUpdate={handleYouTubeTimeUpdate}
           onPlayerReady={handleYouTubePlayerReady}
+          onError={handleYouTubeError}
         />
       ) : (
-        // Renderizar player padrão para vídeos normais e Drive
+        // Render standard player for normal videos and Drive
         <video
           ref={videoRef}
           className="w-full h-full"
           controls
           crossOrigin="anonymous"
           playsInline
+          preload="metadata"
         >
           <source src={getVideoSource()} type="video/mp4" />
           <track kind="captions" />

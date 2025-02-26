@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Layout from '../../components/Layout'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../hooks/useAuth'
-import { AdminThumbnail } from '../../components/AdminThumbnail'
+import AdminThumbnail from '../../components/AdminThumbnail'
 
 export default function AdminDashboard() {
   const [media, setMedia] = useState([])

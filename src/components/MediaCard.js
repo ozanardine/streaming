@@ -1,8 +1,11 @@
-import React from 'react'
+import React, { memo } from 'react'
 import Link from 'next/link'
 import SafeImage from './SafeImage'
 
-const MediaCard = ({ media }) => {
+// Use memo to prevent unnecessary re-renders
+const MediaCard = memo(({ media }) => {
+  if (!media) return null;
+  
   const progress = media.watch_progress && media.duration 
     ? (media.watch_progress / media.duration * 100) || 0 
     : 0
@@ -21,7 +24,7 @@ const MediaCard = ({ media }) => {
             placeholderClassName="bg-background-dark"
           />
           
-          {/* Hover overlay */}
+          {/* Hover overlay with better animation */}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-300 flex items-center justify-center">
             <div className="rounded-full w-12 h-12 bg-primary/80 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transform scale-75 group-hover:scale-100 transition-all duration-300">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
@@ -34,10 +37,11 @@ const MediaCard = ({ media }) => {
         <div className="px-1 py-2">
           <h3 className="text-sm font-medium truncate">{media.title}</h3>
           
+          {/* Progress bar with animation */}
           {hasProgress && (
             <div className="mt-2 h-1 bg-background-light rounded-full overflow-hidden">
               <div 
-                className="h-full bg-primary"
+                className="h-full bg-primary transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -52,6 +56,8 @@ const MediaCard = ({ media }) => {
       </div>
     </Link>
   )
-}
+});
 
-export default MediaCard
+MediaCard.displayName = 'MediaCard';
+
+export default MediaCard;
