@@ -6,3 +6,7 @@ node_modules
 
 database_roles.sql
 database_structure.sql
+
+package-lock.json
+
+.env.local
