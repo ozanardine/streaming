@@ -12,6 +12,12 @@ const avatarOptions = [
   '/images/avatars/avatar4.png',
   '/images/avatars/avatar5.png',
   '/images/avatars/avatar6.png',
+  '/images/avatars/avatar7.png',
+  '/images/avatars/avatar8.png',
+  '/images/avatars/avatar9.png',
+  '/images/avatars/avatar10.png',
+  '/images/avatars/avatar11.png',
+  '/images/avatars/avatar12.png',
   '/images/default-avatar.png'
 ]
 
@@ -173,7 +179,7 @@ const ProfileSettings = ({ profileId, isNew = false }) => {
             
             {showAvatarSelector && (
               <div className="mt-4 bg-background-dark p-4 rounded-lg shadow-lg w-full max-w-xs">
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-2 max-h-60 overflow-y-auto">
                   {avatarOptions.map((avatar, index) => (
                     <button 
                       key={index} 
