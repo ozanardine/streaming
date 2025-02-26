@@ -3,14 +3,14 @@ import Head from 'next/head'
 import Navbar from './Navbar'
 import { useAuth } from '../hooks/useAuth'
 
-const Layout = ({ children, title = 'Streaming Familiar' }) => {
+const Layout = ({ children, title = 'Zanflix' }) => {
   const { user, profile } = useAuth()
   
   return (
     <>
       <Head>
         <title>{title}</title>
-        <meta name="description" content="Plataforma de streaming para sua família" />
+        <meta name="description" content="Zanflix - Sua plataforma de streaming personalizada" />
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
         <link rel="icon" href="/favicon.ico" />
       </Head>
@@ -25,7 +25,7 @@ const Layout = ({ children, title = 'Streaming Familiar' }) => {
         <footer className="bg-background-dark py-6 mt-12">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 text-center">
             <p className="text-text-secondary text-sm">
-              © {new Date().getFullYear()} Streaming Familiar - Feito com ❤️ para sua família
+              © {new Date().getFullYear()} Zanflix - Feito com ❤️
             </p>
           </div>
         </footer>

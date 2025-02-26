@@ -48,7 +48,7 @@ export default function Login() {
           <div className="w-32 h-10 relative">
             <Image
               src="/images/logo.png"
-              alt="Streaming Familiar"
+              alt="Zanflix"
               fill
               className="object-contain"
             />

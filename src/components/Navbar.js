@@ -41,6 +41,9 @@ const Navbar = () => {
     setShowMenu(false)
   }
 
+  // Verificar se o usuário é admin
+  const isAdmin = user?.is_admin;
+
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -50,7 +53,7 @@ const Navbar = () => {
               <div className="w-24 h-8 relative">
                 <Image 
                   src="/images/logo.png" 
-                  alt="Streaming Familiar" 
+                  alt="Zanflix" 
                   fill
                   className="object-contain"
                   priority
@@ -84,6 +87,14 @@ const Navbar = () => {
                 >
                   Favoritos
                 </Link>
+                {isAdmin && (
+                  <Link 
+                    href="/admin"
+                    className={`${router.pathname.startsWith('/admin') ? 'text-primary font-medium' : 'text-primary hover:text-primary-light'} transition-colors duration-200`}
+                  >
+                    Admin
+                  </Link>
+                )}
               </div>
             </div>
           </div>
@@ -123,12 +134,6 @@ const Navbar = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </button>
-            )}
-            
-            {user?.is_admin && (
-              <Link href="/admin" className="ml-4 text-primary hover:text-primary-light hidden md:block">
-                Admin
-              </Link>
             )}
             
             <div className="relative ml-4" ref={menuRef}>
@@ -183,6 +188,15 @@ const Navbar = () => {
                   </div>
                   
                   <div className="border-t border-background">
+                    {/* Link para Admin Panel (apenas para admins) */}
+                    {isAdmin && (
+                      <Link href="/admin" className="block" onClick={() => setShowMenu(false)}>
+                        <div className="px-4 py-2 text-sm text-primary hover:bg-background-dark font-medium">
+                          Painel Administrativo
+                        </div>
+                      </Link>
+                    )}
+                    
                     <Link href={`/profile/${profile?.id}`} className="block" onClick={() => setShowMenu(false)}>
                       <div className="px-4 py-2 text-sm text-white hover:bg-background-dark">
                         Gerenciar Perfil
@@ -204,7 +218,7 @@ const Navbar = () => {
         
         {/* Mobile menu */}
         <div className="md:hidden border-t border-background-light mt-2 pt-2 pb-3">
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap space-x-3">
             <Link 
               href="/browse" 
               className={`${router.pathname === '/browse' ? 'text-white' : 'text-gray-300'} px-3 py-1 text-sm font-medium`}
@@ -229,7 +243,7 @@ const Navbar = () => {
             >
               Favoritos
             </Link>
-            {user?.is_admin && (
+            {isAdmin && (
               <Link 
                 href="/admin"
                 className="text-primary px-3 py-1 text-sm font-medium"
