@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useToast } from './ToastContext';
 import * as authAPI from '../api/auth';
@@ -15,20 +15,30 @@ export const AuthProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const { error: showError } = useToast();
   
-  // Check if user is admin
+  // Usar useRef para evitar múltiplas verificações e chamadas API
+  const isCheckingAdmin = useRef(false);
+  const adminCheckTimeout = useRef(null);
+  
+  // Check if user is admin - com proteção contra múltiplas chamadas
   const checkIfAdmin = useCallback(async (userId) => {
-    if (!userId) return false;
+    if (!userId || isCheckingAdmin.current) return false;
     
     try {
-      return await authAPI.checkAdmin(userId);
+      isCheckingAdmin.current = true;
+      const adminStatus = await authAPI.checkAdmin(userId);
+      isCheckingAdmin.current = false;
+      return adminStatus;
     } catch (err) {
       console.error('Error checking admin status:', err);
+      isCheckingAdmin.current = false;
       return false;
     }
   }, []);
   
   // Initialize auth state
   useEffect(() => {
+    let isMounted = true;
+    
     const initAuth = async () => {
       try {
         setLoading(true);
@@ -37,22 +47,24 @@ export const AuthProvider = ({ children }) => {
         const session = await authAPI.getSession();
         const currentUser = session?.user || null;
         
-        if (currentUser) {
+        if (currentUser && isMounted) {
           setUser(currentUser);
           
-          // Check admin status
-          const adminStatus = await checkIfAdmin(currentUser.id);
-          setIsAdmin(adminStatus);
-        } else {
+          // Check admin status - apenas uma vez
+          if (!isCheckingAdmin.current) {
+            const adminStatus = await checkIfAdmin(currentUser.id);
+            if (isMounted) setIsAdmin(adminStatus);
+          }
+        } else if (isMounted) {
           setUser(null);
           setProfile(null);
           setIsAdmin(false);
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
-        setError(err.message);
+        if (isMounted) setError(err.message);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
     
@@ -60,6 +72,8 @@ export const AuthProvider = ({ children }) => {
     
     // Set up auth state change listener
     const { data: { subscription } } = authAPI.onAuthStateChange(async (_event, session) => {
+      if (!isMounted) return;
+      
       const currentUser = session?.user || null;
       
       if (currentUser !== user) {
@@ -69,17 +83,30 @@ export const AuthProvider = ({ children }) => {
           setProfile(null);
           setIsAdmin(false);
         } else {
-          // Check admin status on auth state change
-          const adminStatus = await checkIfAdmin(currentUser.id);
-          setIsAdmin(adminStatus);
+          // Limpar qualquer verificação anterior
+          if (adminCheckTimeout.current) {
+            clearTimeout(adminCheckTimeout.current);
+          }
+          
+          // Adiar a verificação para evitar múltiplas chamadas em sequência
+          adminCheckTimeout.current = setTimeout(async () => {
+            if (!isCheckingAdmin.current && isMounted) {
+              const adminStatus = await checkIfAdmin(currentUser.id);
+              if (isMounted) setIsAdmin(adminStatus);
+            }
+          }, 500);
         }
       }
     });
     
     return () => {
+      isMounted = false;
+      if (adminCheckTimeout.current) {
+        clearTimeout(adminCheckTimeout.current);
+      }
       subscription.unsubscribe();
     };
-  }, [checkIfAdmin, user, showError]);
+  }, [checkIfAdmin]);
   
   // Login function
   const login = useCallback(async (email, password) => {
@@ -89,9 +116,8 @@ export const AuthProvider = ({ children }) => {
       
       setUser(data.user);
       
-      // Check admin status
-      const adminStatus = await checkIfAdmin(data.user.id);
-      setIsAdmin(adminStatus);
+      // Não verificamos o status de admin aqui - deixamos o useEffect fazer isso
+      // para evitar múltiplas solicitações
       
       return data;
     } catch (err) {
@@ -99,7 +125,7 @@ export const AuthProvider = ({ children }) => {
       setError(err.message);
       throw err;
     }
-  }, [checkIfAdmin]);
+  }, []);
   
   // Signup function
   const signup = useCallback(async (email, password) => {

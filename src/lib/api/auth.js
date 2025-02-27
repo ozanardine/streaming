@@ -1,5 +1,7 @@
 import { supabase } from '../supabase';
 
+let adminStatusCache = new Map();
+
 /**
  * Signs up a new user with email and password
  * 
@@ -103,14 +105,38 @@ export const updatePassword = async (newPassword) => {
 export const checkAdmin = async (userId) => {
   if (!userId) return false;
   
-  const { data, error } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', userId)
-    .single();
+  // Verificar cache primeiro
+  if (adminStatusCache.has(userId)) {
+    return adminStatusCache.get(userId);
+  }
   
-  if (error) return false;
-  return data?.is_admin || false;
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+    
+    const isAdmin = data?.is_admin || false;
+    
+    // Armazenar no cache
+    adminStatusCache.set(userId, isAdmin);
+    
+    // Limpar cache após 5 minutos
+    setTimeout(() => {
+      adminStatusCache.delete(userId);
+    }, 5 * 60 * 1000);
+    
+    return isAdmin;
+  } catch (err) {
+    console.error('Exception checking admin status:', err);
+    return false;
+  }
 };
 
 /**
