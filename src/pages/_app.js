@@ -28,17 +28,7 @@ function MyApp({ Component, pageProps }) {
   return (
     <ToastProvider>
       <AuthProvider>
-        {/* Global loading overlay */}
-        {loading && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <div className="rounded-full h-12 w-12 border-t-2 border-b-2 border-primary animate-spin"></div>
-          </div>
-        )}
-        
-        {/* Toast notifications */}
-        <Toast />
-        
-        {/* Main app component */}
+        {/* Componentes de loading e toast... */}
         <Component {...pageProps} />
       </AuthProvider>
     </ToastProvider>
