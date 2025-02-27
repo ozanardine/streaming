@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
-import { AuthProvider } from '../hooks/useAuth';
+import { AuthProvider } from '../lib/context/AuthContext';
 import { ToastProvider } from '../lib/context/ToastContext';
 import Toast from '../components/ui/Toast';
 import '../styles/globals.css';
@@ -28,8 +28,13 @@ function MyApp({ Component, pageProps }) {
   return (
     <ToastProvider>
       <AuthProvider>
-        {/* Componentes de loading e toast... */}
+        {loading && (
+          <div className="fixed inset-0 bg-background-dark/50 flex items-center justify-center z-50">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          </div>
+        )}
         <Component {...pageProps} />
+        <Toast />
       </AuthProvider>
     </ToastProvider>
   );

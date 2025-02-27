@@ -15,7 +15,8 @@ export default function Home() {
       } 
       // Se o usuário estiver autenticado mas não tiver selecionado um perfil
       else if (user && !profile) {
-        router.push('/');
+        // Redirecionar para seleção de perfil ao invés de causar loop
+        router.push('/profiles');
       } 
       // Se o usuário não estiver autenticado
       else {

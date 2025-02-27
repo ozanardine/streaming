@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import AuthContext, { AuthProvider } from '../lib/context/AuthContext';
+import AuthContext from '../lib/context/AuthContext';
 
 /**
  * Hook to access authentication functionality
@@ -12,6 +12,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-// Re-export the AuthProvider for easier imports
-export { AuthProvider };

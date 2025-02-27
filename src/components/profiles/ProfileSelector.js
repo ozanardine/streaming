@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useProfiles } from '../../hooks/useProfiles';
 import { useAuth } from '../../hooks/useAuth';
 import LoadingSpinner from '../ui/LoadingSpinner';
@@ -90,15 +91,22 @@ const AddProfileButton = () => {
 };
 
 const ProfileSelector = () => {
-  const { profiles, loading, error } = useProfiles();
+  const { profiles, loading, error, fetchProfiles } = useProfiles();
   const { setCurrentProfile } = useAuth();
   const [selectedProfile, setSelectedProfile] = useState(null);
+  const router = useRouter();
+
+  // Recarregar perfis quando o componente montar para garantir que temos os dados atualizados
+  useEffect(() => {
+    fetchProfiles();
+  }, [fetchProfiles]);
 
   const handleProfileSelect = (profile) => {
     setSelectedProfile(profile.id);
     // Small delay to show the selection animation before navigating
     setTimeout(() => {
       setCurrentProfile(profile);
+      router.push('/browse');
     }, 500);
   };
 
@@ -133,7 +141,7 @@ const ProfileSelector = () => {
           <h2 className="mb-4 text-xl font-bold text-error">Erro</h2>
           <p className="mb-6 text-text-secondary">{error}</p>
           <button 
-            onClick={() => window.location.reload()}
+            onClick={() => fetchProfiles()}
             className="rounded-md bg-primary px-4 py-2 text-white hover:bg-primary-dark"
           >
             Tentar novamente
@@ -163,7 +171,7 @@ const ProfileSelector = () => {
         </h1>
         
         <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4 lg:gap-8 max-w-4xl">
-          {profiles.map(profile => (
+          {profiles && profiles.map(profile => (
             <ProfileCard 
               key={profile.id} 
               profile={profile} 
@@ -173,13 +181,20 @@ const ProfileSelector = () => {
           ))}
           
           {/* Add profile button */}
-          {profiles.length < 5 && (
+          {profiles && profiles.length < 5 && (
             <AddProfileButton />
+          )}
+
+          {/* Se não houver perfis, mostrar mensagem e botão para criar */}
+          {profiles && profiles.length === 0 && (
+            <div className="col-span-2 sm:col-span-3 lg:col-span-4 text-center">
+              <p className="text-text-secondary mb-4">Nenhum perfil encontrado. Crie seu primeiro perfil para começar.</p>
+            </div>
           )}
         </div>
         
         {/* Manage profiles button */}
-        {profiles.length > 0 && (
+        {profiles && profiles.length > 0 && (
           <button 
             className="mt-12 rounded-md border border-text-secondary/30 px-6 py-2 text-text-secondary transition-colors hover:border-text-secondary hover:text-white"
             onClick={() => router.push('/manage-profiles')}

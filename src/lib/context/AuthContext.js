@@ -1,7 +1,6 @@
 import { createContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../supabase';
 import { useToast } from './ToastContext';
-import * as authAPI from '../api/auth';
 
 // Create the auth context
 const AuthContext = createContext(undefined);
@@ -12,25 +11,25 @@ export const AuthProvider = ({ children }) => {
   const [profile, setProfile] = useState(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState(null);
   const { error: showError } = useToast();
   
-  // Usar useRef para evitar múltiplas verificações e chamadas API
-  const isCheckingAdmin = useRef(false);
-  const adminCheckTimeout = useRef(null);
-  
-  // Check if user is admin - com proteção contra múltiplas chamadas
+  // Check if user is admin - simplificado para evitar múltiplas chamadas
   const checkIfAdmin = useCallback(async (userId) => {
-    if (!userId || isCheckingAdmin.current) return false;
+    if (!userId) return false;
     
     try {
-      isCheckingAdmin.current = true;
-      const adminStatus = await authAPI.checkAdmin(userId);
-      isCheckingAdmin.current = false;
-      return adminStatus;
+      const { data, error } = await supabase
+        .from('users')
+        .select('is_admin')
+        .eq('id', userId)
+        .single();
+      
+      if (error) throw error;
+      return data?.is_admin || false;
     } catch (err) {
       console.error('Error checking admin status:', err);
-      isCheckingAdmin.current = false;
       return false;
     }
   }, []);
@@ -44,66 +43,78 @@ export const AuthProvider = ({ children }) => {
         setLoading(true);
         
         // Get current session
-        const session = await authAPI.getSession();
-        const currentUser = session?.user || null;
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
+        
+        const session = data?.session;
+        const currentUser = session?.user;
         
         if (currentUser && isMounted) {
           setUser(currentUser);
           
-          // Check admin status - apenas uma vez
-          if (!isCheckingAdmin.current) {
-            const adminStatus = await checkIfAdmin(currentUser.id);
-            if (isMounted) setIsAdmin(adminStatus);
+          // Check admin status
+          const adminStatus = await checkIfAdmin(currentUser.id);
+          if (isMounted) setIsAdmin(adminStatus);
+          
+          // Try to get last used profile from localStorage
+          const lastProfileId = localStorage.getItem('lastProfileId');
+          if (lastProfileId) {
+            try {
+              const { data: profileData } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', lastProfileId)
+                .eq('user_id', currentUser.id)
+                .single();
+                
+              if (profileData && isMounted) {
+                setProfile(profileData);
+              }
+            } catch (profileError) {
+              console.error('Error fetching last profile:', profileError);
+              // Continue without setting profile
+            }
           }
         } else if (isMounted) {
           setUser(null);
           setProfile(null);
           setIsAdmin(false);
+          localStorage.removeItem('lastProfileId');
         }
       } catch (err) {
         console.error('Error initializing auth:', err);
         if (isMounted) setError(err.message);
       } finally {
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          setInitialized(true);
+        }
       }
     };
     
     initAuth();
     
     // Set up auth state change listener
-    const { data: { subscription } } = authAPI.onAuthStateChange(async (_event, session) => {
-      if (!isMounted) return;
-      
-      const currentUser = session?.user || null;
-      
-      if (currentUser !== user) {
-        setUser(currentUser);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!isMounted) return;
         
-        if (!currentUser) {
+        if (event === 'SIGNED_IN' && session?.user) {
+          setUser(session.user);
+          const adminStatus = await checkIfAdmin(session.user.id);
+          if (isMounted) setIsAdmin(adminStatus);
+        } else if (event === 'SIGNED_OUT' || event === 'USER_DELETED') {
+          setUser(null);
           setProfile(null);
           setIsAdmin(false);
-        } else {
-          // Limpar qualquer verificação anterior
-          if (adminCheckTimeout.current) {
-            clearTimeout(adminCheckTimeout.current);
-          }
-          
-          // Adiar a verificação para evitar múltiplas chamadas em sequência
-          adminCheckTimeout.current = setTimeout(async () => {
-            if (!isCheckingAdmin.current && isMounted) {
-              const adminStatus = await checkIfAdmin(currentUser.id);
-              if (isMounted) setIsAdmin(adminStatus);
-            }
-          }, 500);
+          localStorage.removeItem('lastProfileId');
         }
       }
-    });
+    );
     
     return () => {
       isMounted = false;
-      if (adminCheckTimeout.current) {
-        clearTimeout(adminCheckTimeout.current);
-      }
       subscription.unsubscribe();
     };
   }, [checkIfAdmin]);
@@ -112,12 +123,23 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (email, password) => {
     try {
       setError(null);
-      const data = await authAPI.login(email, password);
+      
+      if (!email || !password) {
+        throw new Error('Email e senha são obrigatórios');
+      }
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
+      if (error) throw error;
       
       setUser(data.user);
       
-      // Não verificamos o status de admin aqui - deixamos o useEffect fazer isso
-      // para evitar múltiplas solicitações
+      // Check admin in separate call to avoid multiple context updates
+      const adminStatus = await checkIfAdmin(data.user.id);
+      setIsAdmin(adminStatus);
       
       return data;
     } catch (err) {
@@ -125,38 +147,36 @@ export const AuthProvider = ({ children }) => {
       setError(err.message);
       throw err;
     }
-  }, []);
-  
-  // Signup function
-  const signup = useCallback(async (email, password) => {
-    try {
-      setError(null);
-      const data = await authAPI.signup(email, password);
-      return data;
-    } catch (err) {
-      console.error('Signup error:', err);
-      setError(err.message);
-      throw err;
-    }
-  }, []);
+  }, [checkIfAdmin]);
   
   // Logout function
   const logout = useCallback(async () => {
     try {
-      await authAPI.logout();
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      // Clear auth state
       setUser(null);
       setProfile(null);
       setIsAdmin(false);
+      localStorage.removeItem('lastProfileId');
     } catch (err) {
       console.error('Logout error:', err);
       setError(err.message);
-      showError('Erro ao sair da conta. Tente novamente.');
+      showError && showError('Erro ao sair da conta. Tente novamente.');
     }
   }, [showError]);
   
   // Set current profile
   const setCurrentProfile = useCallback((selectedProfile) => {
-    setProfile(selectedProfile);
+    if (selectedProfile) {
+      setProfile(selectedProfile);
+      // Save to localStorage for persistence
+      localStorage.setItem('lastProfileId', selectedProfile.id);
+    } else {
+      setProfile(null);
+      localStorage.removeItem('lastProfileId');
+    }
   }, []);
   
   // Clear error
@@ -169,10 +189,9 @@ export const AuthProvider = ({ children }) => {
     user,
     profile,
     isAdmin,
-    loading,
+    loading: loading || !initialized,
     error,
     login,
-    signup,
     logout,
     setCurrentProfile,
     clearError

@@ -3,7 +3,9 @@ import { useRouter } from 'next/router';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '../../hooks/useAuth';
+import { useProfiles } from '../../hooks/useProfiles';
 import Button from '../ui/Button';
+import { useToast } from '../../hooks/useToast';
 
 const LoginForm = () => {
   const [email, setEmail] = useState('');
@@ -12,6 +14,8 @@ const LoginForm = () => {
   const [message, setMessage] = useState(null);
   const [loading, setLoading] = useState(false);
   const { login, user } = useAuth();
+  const { profiles, loading: profilesLoading } = useProfiles();
+  const { error: showError } = useToast();
   const router = useRouter();
   
   // Verificar se há mensagem de redirecionamento
@@ -21,22 +25,37 @@ const LoginForm = () => {
     }
   }, [router.query]);
   
-  // Redirecionar se já estiver logado
+  // Redirecionar após autenticação bem-sucedida
   useEffect(() => {
-    if (user) {
-      router.push('/');
+    if (user && !profilesLoading) {
+      // Se tiver perfis, vai para a seleção de perfil
+      // Se não tiver perfis, vai para a criação de perfil
+      if (profiles && profiles.length > 0) {
+        router.push('/profiles');
+      } else {
+        router.push('/profile/new');
+      }
     }
-  }, [user, router]);
+  }, [user, profiles, profilesLoading, router]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      setError('Por favor, preencha todos os campos');
+      return;
+    }
+    
     setError(null);
     setLoading(true);
     
     try {
       await login(email, password);
-    } catch (error) {
-      setError(error.message);
+      // O redirecionamento será tratado pelo useEffect acima
+    } catch (err) {
+      console.error('Erro de login:', err);
+      setError(err.message || 'Erro ao fazer login. Verifique suas credenciais.');
+      showError && showError('Falha na autenticação. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -83,6 +102,7 @@ const LoginForm = () => {
               className="w-full rounded border-0 bg-background-light p-3 text-white focus:ring-2 focus:ring-primary"
               placeholder="seu@email.com"
               required
+              disabled={loading}
             />
           </div>
           
@@ -103,6 +123,7 @@ const LoginForm = () => {
               className="w-full rounded border-0 bg-background-light p-3 text-white focus:ring-2 focus:ring-primary"
               placeholder="Sua senha"
               required
+              disabled={loading}
             />
           </div>
           
@@ -111,6 +132,7 @@ const LoginForm = () => {
             variant="primary"
             fullWidth
             isLoading={loading}
+            disabled={loading}
           >
             {loading ? 'Entrando...' : 'Entrar'}
           </Button>
