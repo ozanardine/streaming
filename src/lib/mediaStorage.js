@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
 import { v4 as uuidv4 } from 'uuid'
-import { formatExternalUrl, getVideoUrlType } from './videoHelpers'
+import { formatExternalUrl, getVideoUrlType } from './helpers/videoHelpers'
 
 // Upload de arquivo para o Supabase Storage
 export const uploadToSupabase = async (file, folder = 'videos') => {

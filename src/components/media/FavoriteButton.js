@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '../hooks/useAuth'
-import { supabase } from '../lib/supabase'
+import { useAuth } from '../../hooks/useAuth'
+import { supabase } from '../../lib/supabase'
 
 const FavoriteButton = ({ mediaId }) => {
   const [isFavorite, setIsFavorite] = useState(false)
