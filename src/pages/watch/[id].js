@@ -1,68 +1,64 @@
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/router'
-import Image from 'next/image'
-import Link from 'next/link'
-import { useAuth } from '../../hooks/useAuth'
-import Layout from '../../components/Layout'
-import FavoriteButton from '../../components/FavoriteButton'
-import { getMediaDetails } from '../../lib/mediaStorage'
-import { supabase } from '../../lib/supabase'
-import dynamic from 'next/dynamic'
-import { getVideoUrlType } from '../../lib/videoHelpers'
-
-// Importar o VideoPlayer sem SSR
-const VideoPlayer = dynamic(() => import('../../components/VideoPlayer'), { 
-  ssr: false,
-  loading: () => (
-    <div className="aspect-video bg-background-dark flex items-center justify-center">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-    </div>
-  )
-})
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import Link from 'next/link';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../lib/context/ToastContext';
+import Layout from '../../components/layout/Layout';
+import FavoriteButton from '../../components/media/FavoriteButton';
+import MediaGrid from '../../components/media/MediaGrid';
+import VideoPlayer from '../../components/media/VideoPlayer';
+import Button from '../../components/ui/Button';
+import { getMediaDetails } from '../../lib/mediaStorage';
+import { supabase } from '../../lib/supabase';
+import { getVideoUrlType } from '../../lib/helpers/videoHelpers';
+import { formatDuration } from '../../lib/helpers/dateFormat';
 
 export default function WatchPage() {
-  const router = useRouter()
-  const { id } = router.query
-  const { user, profile, loading: authLoading } = useAuth()
-  const [media, setMedia] = useState(null)
-  const [progress, setProgress] = useState(0)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  const [relatedMedia, setRelatedMedia] = useState([])
-  const [videoType, setVideoType] = useState('standard')
+  const router = useRouter();
+  const { id } = router.query;
+  const { user, profile, loading: authLoading } = useAuth();
+  const { error: showError } = useToast();
+  
+  const [media, setMedia] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [relatedMedia, setRelatedMedia] = useState([]);
+  const [videoType, setVideoType] = useState('standard');
+  const [showDescription, setShowDescription] = useState(false);
 
   useEffect(() => {
     const fetchMedia = async () => {
-      if (!id || !profile) return
+      if (!id || !profile) return;
       
       try {
-        // Buscar detalhes da mídia
-        const mediaData = await getMediaDetails(id)
+        // Fetch media details
+        const mediaData = await getMediaDetails(id);
         
-        // Determinar o tipo de vídeo
-        const detectedType = mediaData.type || getVideoUrlType(mediaData.media_url)
-        setVideoType(detectedType)
+        // Determine video type
+        const detectedType = mediaData.type || getVideoUrlType(mediaData.media_url);
+        setVideoType(detectedType);
         
-        setMedia(mediaData)
+        setMedia(mediaData);
         
-        // Buscar progresso de visualização
+        // Fetch viewing progress
         try {
           const { data: progressData } = await supabase
             .from('watch_progress')
             .select('*')
             .eq('media_id', id)
             .eq('profile_id', profile.id)
-            .maybeSingle()
+            .maybeSingle();
           
           if (progressData) {
-            setProgress(progressData.progress || 0)
+            setProgress(progressData.progress || 0);
           }
         } catch (progressError) {
-          console.error('Aviso: Erro ao buscar progresso:', progressError)
-          // Continuar mesmo com erro de progresso
+          console.error('Warning: Error fetching progress:', progressError);
+          // Continue even with progress error
         }
         
-        // Buscar mídia relacionada (mesma categoria)
+        // Fetch related media (same category)
         try {
           if (mediaData.category) {
             const { data: relatedData } = await supabase
@@ -70,65 +66,66 @@ export default function WatchPage() {
               .select('*')
               .eq('category', mediaData.category)
               .neq('id', id)
-              .limit(4)
+              .limit(6);
               
-            setRelatedMedia(relatedData || [])
+            setRelatedMedia(relatedData || []);
           }
         } catch (relatedError) {
-          console.error('Aviso: Erro ao buscar mídia relacionada:', relatedError)
-          // Continuar mesmo com erro em mídia relacionada
+          console.error('Warning: Error fetching related media:', relatedError);
+          // Continue even with related media error
         }
       } catch (err) {
-        console.error('Erro ao buscar detalhes:', err)
-        setError('Não foi possível carregar este vídeo')
+        console.error('Error fetching details:', err);
+        setError('Não foi possível carregar este vídeo');
+        showError('Erro ao carregar o vídeo. Tente novamente mais tarde.');
       } finally {
-        setLoading(false)
+        setLoading(false);
       }
-    }
+    };
 
-    fetchMedia()
-  }, [id, profile])
+    fetchMedia();
+  }, [id, profile, showError]);
 
   useEffect(() => {
     if (!authLoading && (!user || !profile)) {
-      router.push('/')
+      router.push('/');
     }
-  }, [user, profile, authLoading, router])
+  }, [user, profile, authLoading, router]);
 
-  if (authLoading || loading) {
+  if (authLoading || (loading && id)) {
     return (
       <Layout title="Carregando...">
         <div className="flex justify-center items-center min-h-[60vh]">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary/10 border-t-primary"></div>
         </div>
       </Layout>
-    )
+    );
   }
 
   if (error) {
     return (
       <Layout title="Erro">
-        <div className="max-w-md mx-auto bg-background-light p-6 rounded-lg shadow-lg">
-          <h2 className="text-xl font-bold text-red-500 mb-4">Erro</h2>
-          <p className="mb-6">{error}</p>
-          <button 
+        <div className="max-w-md mx-auto rounded-lg bg-background-card p-6 shadow-xl border border-background-light/20">
+          <h2 className="text-xl font-bold text-error mb-4">Erro</h2>
+          <p className="mb-6 text-text-secondary">{error}</p>
+          <Button 
             onClick={() => router.back()}
-            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
+            variant="primary"
           >
             Voltar
-          </button>
+          </Button>
         </div>
       </Layout>
-    )
+    );
   }
 
   if (!media) {
-    return null
+    return null;
   }
 
   return (
     <Layout title={media.title}>
-      <div className="max-w-5xl mx-auto">
+      <div className="max-w-6xl mx-auto">
         <h1 className="text-2xl md:text-3xl font-bold mb-6">{media.title}</h1>
         
         <div className="mb-8">
@@ -141,59 +138,57 @@ export default function WatchPage() {
         </div>
         
         <div className="space-y-8">
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <FavoriteButton mediaId={media.id} />
             
             {media.category && (
               <Link 
                 href={`/browse?category=${encodeURIComponent(media.category)}`}
-                className="px-3 py-1 bg-background-light hover:bg-background text-sm rounded-md transition-colors"
+                className="rounded-full bg-background-light/50 px-4 py-1 text-sm transition-colors hover:bg-background-light"
               >
                 {media.category}
               </Link>
+            )}
+            
+            {media.duration > 0 && (
+              <span className="rounded-full bg-background-light/30 px-3 py-1 text-sm text-text-secondary">
+                {formatDuration(media.duration)}
+              </span>
             )}
           </div>
           
           {media.description && (
             <div>
-              <h3 className="text-lg font-semibold mb-2">Descrição</h3>
-              <p className="text-text-secondary">{media.description}</p>
+              <div className={`relative ${!showDescription && 'max-h-20 overflow-hidden'}`}>
+                <h3 className="text-lg font-semibold mb-2">Descrição</h3>
+                <p className="text-text-secondary">
+                  {media.description}
+                </p>
+                
+                {!showDescription && media.description.length > 150 && (
+                  <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-background to-transparent" />
+                )}
+              </div>
+              
+              {media.description.length > 150 && (
+                <button 
+                  className="mt-2 text-primary text-sm hover:text-primary-light"
+                  onClick={() => setShowDescription(!showDescription)}
+                >
+                  {showDescription ? 'Mostrar menos' : 'Mostrar mais'}
+                </button>
+              )}
             </div>
           )}
           
           {relatedMedia.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-4">Conteúdo relacionado</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {relatedMedia.map(item => (
-                  <Link 
-                    href={`/watch/${item.id}`} 
-                    key={item.id}
-                    className="block group"
-                  >
-                    <div className="aspect-video relative rounded overflow-hidden bg-background-dark mb-2">
-                      {item.thumbnail_url ? (
-                        <Image 
-                          src={item.thumbnail_url} 
-                          alt={item.title} 
-                          fill
-                          className="object-cover group-hover:scale-105 transition-transform duration-300"
-                          unoptimized={true}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center p-2 text-xs text-center text-text-secondary">
-                          <span>{item.title}</span>
-                        </div>
-                      )}
-                    </div>
-                    <h4 className="text-sm group-hover:text-primary transition-colors duration-200 truncate">{item.title}</h4>
-                  </Link>
-                ))}
-              </div>
+            <div className="pt-4">
+              <h3 className="text-xl font-semibold mb-4">Conteúdo relacionado</h3>
+              <MediaGrid items={relatedMedia} columns={2} />
             </div>
           )}
         </div>
       </div>
     </Layout>
-  )
+  );
 }

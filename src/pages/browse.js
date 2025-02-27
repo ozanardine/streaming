@@ -1,59 +1,89 @@
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/router'
-import { useAuth } from '../hooks/useAuth'
-import { useMedia } from '../hooks/useMedia'
-import Layout from '../components/Layout'
-import CategoryRow from '../components/CategoryRow'
-import ErrorDisplay from '../components/ErrorDisplay'
-import LoadingSpinner from '../components/LoadingSpinner'
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useAuth } from '../hooks/useAuth';
+import { useMedia } from '../hooks/useMedia';
+import Layout from '../components/layout/Layout';
+import CategoryRow from '../components/media/CategoryRow';
+import MediaGrid from '../components/media/MediaGrid';
+import ErrorDisplay from '../components/ui/ErrorDisplay';
+import Button from '../components/ui/Button';
+import { useToast } from '../lib/context/ToastContext';
 
 export default function Browse() {
-  const { user, profile, loading: authLoading } = useAuth()
-  const router = useRouter()
-  const { category } = router.query
+  const { user, profile, loading: authLoading } = useAuth();
+  const { error: showError } = useToast();
+  const router = useRouter();
+  const { category } = router.query;
   
   // Track overall loading state
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // Use customized category for specific routes
-  const displayCategory = category || null
+  const displayCategory = category || null;
   
   // Use the custom hooks with better error handling
-  const { media: recentlyAdded, loading: mediaLoading, error: mediaError } = useMedia()
-  const { media: filmsMedia, loading: filmsLoading, error: filmsError } = useMedia('filmes')
-  const { media: seriesMedia, loading: seriesLoading, error: seriesError } = useMedia('series')
+  const { media: recentlyAdded, loading: mediaLoading, error: mediaError } = useMedia();
+  const { media: filmsMedia, loading: filmsLoading, error: filmsError } = useMedia('filmes');
+  const { media: seriesMedia, loading: seriesLoading, error: seriesError } = useMedia('series');
+  const { media: animeMedia, loading: animeLoading, error: animeError } = useMedia('anime');
 
   // Auth redirection
   useEffect(() => {
     if (!authLoading && (!user || !profile)) {
-      router.push('/')
+      router.push('/');
     }
-  }, [user, profile, authLoading, router])
+  }, [user, profile, authLoading, router]);
   
   // Handle loading states
   useEffect(() => {
-    setIsLoading(authLoading || mediaLoading || filmsLoading || seriesLoading)
-  }, [authLoading, mediaLoading, filmsLoading, seriesLoading])
+    setIsLoading(authLoading || mediaLoading || filmsLoading || seriesLoading || animeLoading);
+  }, [authLoading, mediaLoading, filmsLoading, seriesLoading, animeLoading]);
   
   // Handle errors
   useEffect(() => {
-    const currentError = mediaError || filmsError || seriesError
+    const currentError = mediaError || filmsError || seriesError || animeError;
     if (currentError) {
-      setError(currentError)
+      setError(currentError);
+      showError('Erro ao carregar conteúdo. Verifique sua conexão com a internet.');
     } else {
-      setError(null)
+      setError(null);
     }
-  }, [mediaError, filmsError, seriesError])
+  }, [mediaError, filmsError, seriesError, animeError, showError]);
+
+  // Build page title based on category
+  const getPageTitle = () => {
+    if (!displayCategory) return 'Início';
+    
+    // Capitalize first letter
+    return displayCategory.charAt(0).toUpperCase() + displayCategory.slice(1);
+  };
+
+  const getCategoryDescription = () => {
+    switch (displayCategory) {
+      case 'filmes':
+        return 'Os melhores filmes para você assistir';
+      case 'series':
+        return 'As melhores séries para você maratonar';
+      case 'anime':
+        return 'Os melhores animes para você assistir';
+      case 'documentarios':
+        return 'Os melhores documentários para você aprender';
+      case 'recentes':
+        return 'Conteúdos recém adicionados à plataforma';
+      default:
+        return 'Navegue por todos os conteúdos disponíveis';
+    }
+  };
 
   if (isLoading) {
     return (
-      <Layout title="Carregando...">
-        <div className="flex justify-center items-center min-h-[60vh]">
-          <LoadingSpinner size="large" message="Carregando conteúdo..." />
+      <Layout title="Carregando..." showFooter={false}>
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
         </div>
       </Layout>
-    )
+    );
   }
 
   if (error) {
@@ -65,69 +95,110 @@ export default function Browse() {
           onButtonClick={() => window.location.reload()}
         />
       </Layout>
-    )
+    );
   }
 
   if (!user || !profile) {
-    return null
+    return null;
   }
 
   // Filter media with progress for "Continue watching"
   const mediaToResume = recentlyAdded.filter(item => 
     item.watch_progress > 0 && 
     item.watch_progress < (item.duration * 0.95)
-  )
+  );
+
+  // Only show grid view for specific category pages
+  const showGridView = !!displayCategory;
 
   return (
-    <Layout title={displayCategory ? `${displayCategory.charAt(0).toUpperCase() + displayCategory.slice(1)}` : "Início"}>
-      <div className="pt-4 pb-8">
-        <h1 className="text-3xl font-bold mb-8">
-          {displayCategory 
-            ? `${displayCategory.charAt(0).toUpperCase() + displayCategory.slice(1)}`
-            : `Olá, ${profile.name}`}
-        </h1>
+    <Layout 
+      title={getPageTitle()}
+      description={getCategoryDescription()}
+      fullWidth={!showGridView}
+    >
+      <div className="py-6">
+        {/* Welcome message and feature highlight for homepage */}
+        {!displayCategory && (
+          <div className="relative mb-8 rounded-xl bg-gradient-to-r from-primary to-secondary-dark overflow-hidden">
+            <div className="absolute inset-0 bg-[url('/images/pattern.png')] opacity-10"></div>
+            <div className="relative p-6 md:p-8 lg:p-10">
+              <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                Olá, {profile.name}!
+              </h1>
+              <p className="text-white/90 mb-4 max-w-xl">
+                Descubra novos conteúdos, acompanhe suas séries favoritas e tenha uma experiência personalizada.
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => router.push('/favorites')}
+                className="bg-white/10 hover:bg-white/20 border-white/30"
+              >
+                Meus Favoritos
+              </Button>
+            </div>
+          </div>
+        )}
 
-        {mediaToResume.length > 0 && !displayCategory && (
-          <CategoryRow 
-            title="Continue Assistindo" 
-            media={mediaToResume} 
-          />
-        )}
-        
-        {(!displayCategory || displayCategory === 'recentes') && (
-          <CategoryRow 
-            title="Adicionados Recentemente" 
-            media={recentlyAdded} 
-          />
-        )}
-        
-        {(!displayCategory || displayCategory === 'filmes') && filmsMedia.length > 0 && (
-          <CategoryRow 
-            title="Filmes" 
-            media={filmsMedia} 
-          />
-        )}
-        
-        {(!displayCategory || displayCategory === 'series') && seriesMedia.length > 0 && (
-          <CategoryRow 
-            title="Séries" 
-            media={seriesMedia} 
-          />
-        )}
-        
-        {/* Show empty state if no content is available for the selected category */}
+        {/* Page title for category pages */}
         {displayCategory && (
-          (displayCategory === 'filmes' && filmsMedia.length === 0) || 
-          (displayCategory === 'series' && seriesMedia.length === 0)
-        ) && (
-          <div className="flex flex-col items-center justify-center p-12 bg-background-light rounded-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-text-secondary mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" />
-            </svg>
-            <p className="text-lg text-text-secondary">Nenhum conteúdo disponível para esta categoria.</p>
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold">{getPageTitle()}</h1>
+            <p className="text-text-secondary mt-2">{getCategoryDescription()}</p>
+          </div>
+        )}
+
+        {showGridView ? (
+          // Grid view for category pages
+          <MediaGrid 
+            items={
+              displayCategory === 'filmes' ? filmsMedia :
+              displayCategory === 'series' ? seriesMedia :
+              displayCategory === 'anime' ? animeMedia :
+              displayCategory === 'recentes' ? recentlyAdded :
+              recentlyAdded
+            }
+            loading={isLoading}
+            emptyMessage={`Nenhum conteúdo disponível para a categoria ${displayCategory}`}
+          />
+        ) : (
+          // Row view for homepage
+          <div className="space-y-12">
+            {mediaToResume.length > 0 && (
+              <CategoryRow 
+                title="Continue Assistindo" 
+                media={mediaToResume} 
+              />
+            )}
+            
+            <CategoryRow 
+              title="Adicionados Recentemente" 
+              media={recentlyAdded} 
+            />
+            
+            {filmsMedia.length > 0 && (
+              <CategoryRow 
+                title="Filmes" 
+                media={filmsMedia} 
+              />
+            )}
+            
+            {seriesMedia.length > 0 && (
+              <CategoryRow 
+                title="Séries" 
+                media={seriesMedia} 
+              />
+            )}
+            
+            {animeMedia.length > 0 && (
+              <CategoryRow 
+                title="Animes" 
+                media={animeMedia} 
+              />
+            )}
           </div>
         )}
       </div>
     </Layout>
-  )
+  );
 }

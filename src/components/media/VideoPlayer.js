@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState, useCallback, memo } from 'react'
-import { updateWatchProgress } from '../lib/mediaStorage'
-import { useAuth } from '../hooks/useAuth'
-import { extractYouTubeId, formatGoogleDriveUrl } from '../lib/videoHelpers'
+import React, { useEffect, useRef, useState, useCallback, memo } from 'react';
+import { updateWatchProgress } from '../../lib/mediaStorage';
+import { useAuth } from '../../hooks/useAuth';
+import { extractYouTubeId, formatGoogleDriveUrl } from '../../lib/helpers/videoHelpers';
+import { useToast } from '../../lib/context/ToastContext';
 
 // Separate YouTubePlayer into a memoized component to prevent unnecessary re-renders
 const YouTubePlayer = memo(({ videoId, initialProgress, onTimeUpdate, onPlayerReady, onError }) => {
@@ -37,7 +38,7 @@ const YouTubePlayer = memo(({ videoId, initialProgress, onTimeUpdate, onPlayerRe
           height: '100%',
           width: '100%',
           playerVars: {
-            autoplay: 0,
+            autoplay: 1,
             controls: 1,
             rel: 0,
             showinfo: 0,
@@ -124,7 +125,9 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
   const videoRef = useRef(null);
   const playerRef = useRef(null);
   const saveProgressTimerRef = useRef(null);
+  const playerContainerRef = useRef(null);
   const { profile } = useAuth();
+  const { error: showError } = useToast();
   const [loaded, setLoaded] = useState(false);
   const [duration, setDuration] = useState(0);
   const [currentTime, setCurrentTime] = useState(initialProgress);
@@ -132,6 +135,9 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
   const [youtubeId, setYoutubeId] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showControls, setShowControls] = useState(false);
+  const [controlsTimeout, setControlsTimeout] = useState(null);
 
   // Detect video type and extract info
   useEffect(() => {
@@ -163,6 +169,32 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
 
     detectVideoType();
   }, [mediaUrl, videoType]);
+
+  // Handle mouse movement for control visibility
+  const handleMouseMove = useCallback(() => {
+    setShowControls(true);
+    
+    // Clear existing timeout
+    if (controlsTimeout) {
+      clearTimeout(controlsTimeout);
+    }
+    
+    // Set new timeout to hide controls
+    const timeout = setTimeout(() => {
+      setShowControls(false);
+    }, 3000);
+    
+    setControlsTimeout(timeout);
+  }, [controlsTimeout]);
+
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (controlsTimeout) {
+        clearTimeout(controlsTimeout);
+      }
+    };
+  }, [controlsTimeout]);
 
   // Initialize standard player for non-YouTube videos
   const initializeStandardPlayer = useCallback(async () => {
@@ -247,18 +279,28 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
         setCurrentTime(playerRef.current.currentTime || 0);
       });
       
+      playerRef.current.on('enterfullscreen', () => {
+        setIsFullscreen(true);
+      });
+      
+      playerRef.current.on('exitfullscreen', () => {
+        setIsFullscreen(false);
+      });
+      
       playerRef.current.on('error', (event) => {
         console.error('Player error:', event);
         setError('Erro ao reproduzir vídeo. Tente novamente.');
+        showError('Falha ao carregar o vídeo. Verifique sua conexão com a internet.');
         setLoading(false);
       });
       
     } catch (error) {
       console.error('Error initializing player:', error);
       setError('Não foi possível inicializar o player de vídeo.');
+      showError('Erro ao inicializar o player de vídeo.');
       setLoading(false);
     }
-  }, [initialProgress]);
+  }, [initialProgress, showError]);
 
   useEffect(() => {
     if ((playerType === 'standard' || playerType === 'drive') && videoRef.current && !playerRef.current) {
@@ -296,6 +338,7 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
         break;
     }
     setError(errorMessage);
+    showError(errorMessage);
     setLoading(false);
   };
 
@@ -364,11 +407,26 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
     return mediaUrl;
   }, [playerType, mediaUrl]);
 
+  // Format time for display
+  const formatTime = (timeInSeconds) => {
+    if (!timeInSeconds) return '0:00';
+    
+    const minutes = Math.floor(timeInSeconds / 60);
+    const seconds = Math.floor(timeInSeconds % 60);
+    
+    return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+  };
+
+  // Calculate progress percentage
+  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
   // Show loading state
   if (loading) {
     return (
-      <div className="aspect-video bg-black rounded-lg shadow-lg overflow-hidden relative flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      <div className="relative aspect-video overflow-hidden rounded-lg bg-black shadow-lg">
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary/10 border-t-primary"></div>
+        </div>
       </div>
     );
   }
@@ -376,16 +434,16 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
   // Show error state
   if (error) {
     return (
-      <div className="aspect-video bg-black rounded-lg shadow-lg overflow-hidden relative flex items-center justify-center">
-        <div className="text-center p-4">
-          <div className="text-red-500 mb-2">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <div className="relative aspect-video overflow-hidden rounded-lg bg-black shadow-lg">
+        <div className="flex h-full w-full flex-col items-center justify-center p-4 text-center">
+          <div className="mb-2 text-error">
+            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
             </svg>
           </div>
-          <p className="text-white">{error}</p>
+          <p className="mb-4 text-lg font-semibold text-white">{error}</p>
           <button 
-            className="mt-4 px-4 py-2 bg-primary hover:bg-primary-dark text-white rounded-md transition-colors"
+            className="rounded-md bg-primary px-4 py-2 text-white transition-colors hover:bg-primary-dark"
             onClick={() => window.location.reload()}
           >
             Tentar novamente
@@ -396,7 +454,12 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
   }
 
   return (
-    <div className="aspect-video bg-black rounded-lg shadow-lg overflow-hidden relative">
+    <div 
+      ref={playerContainerRef}
+      className="relative aspect-video overflow-hidden rounded-lg bg-black shadow-lg"
+      onMouseMove={handleMouseMove}
+      onMouseLeave={() => setShowControls(false)}
+    >
       {playerType === 'youtube' && youtubeId ? (
         // Render YouTube player
         <YouTubePlayer 
@@ -408,17 +471,22 @@ const VideoPlayer = ({ mediaUrl, mediaId, initialProgress = 0, videoType = 'stan
         />
       ) : (
         // Render standard player for normal videos and Drive
-        <video
-          ref={videoRef}
-          className="w-full h-full"
-          controls
-          crossOrigin="anonymous"
-          playsInline
-          preload="metadata"
-        >
-          <source src={getVideoSource()} type="video/mp4" />
-          <track kind="captions" />
-        </video>
+        <>
+          <video
+            ref={videoRef}
+            className="h-full w-full"
+            controls
+            crossOrigin="anonymous"
+            playsInline
+            preload="metadata"
+          >
+            <source src={getVideoSource()} type="video/mp4" />
+            <track kind="captions" />
+          </video>
+          
+          {/* Custom overlay controls if desired */}
+          {/* Removed for now as Plyr provides excellent controls */}
+        </>
       )}
     </div>
   );
