@@ -8,6 +8,7 @@ const nextConfig = {
       'i.ytimg.com',
       'img.youtube.com',
       'lh3.googleusercontent.com',
+      'vercel.app', // Adicionando o domínio do Vercel
     ],
     formats: ['image/avif', 'image/webp'],
     dangerouslyAllowSVG: true,
@@ -20,6 +21,7 @@ const nextConfig = {
         pathname: '/storage/v1/object/public/**',
       },
     ],
+    unoptimized: process.env.NODE_ENV === 'development', // Desativa otimização em desenvolvimento
   },
   // Configurações para otimização de builds
   swcMinify: true,
@@ -27,11 +29,8 @@ const nextConfig = {
     // Remover console.logs em produção
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  // Habilitar experiência de streaming para SSR
-  experimental: {
-    // Estas configurações podem mudar em versões futuras do Next.js
-    scrollRestoration: true,
-  },
+  // Configurações para o Vercel
+  output: 'standalone', // Melhora a velocidade de build no Vercel
 }
 
 module.exports = nextConfig

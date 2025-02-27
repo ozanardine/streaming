@@ -14,9 +14,9 @@ export const useMedia = (category = null, options = {}) => {
   const { error: showError } = useToast();
   
   // Opções com valores padrão
-  const limit = options.limit || 20;
-  const sortBy = options.sortBy || 'created_at';
-  const sortDir = options.sortDir || 'desc';
+  const limit = options?.limit || 20;
+  const sortBy = options?.sortBy || 'created_at';
+  const sortDir = options?.sortDir || 'desc';
   
   const fetchMedia = useCallback(async (reset = false) => {
     if (!profile) {
@@ -93,7 +93,7 @@ export const useMedia = (category = null, options = {}) => {
     } catch (err) {
       console.error('Erro ao buscar mídia:', err);
       setError('Falha ao carregar mídia. Tente novamente.');
-      showError('Erro ao buscar mídia. Verifique sua conexão.');
+      if (showError) showError('Erro ao buscar mídia. Verifique sua conexão.');
     } finally {
       setLoading(false);
     }
@@ -101,8 +101,10 @@ export const useMedia = (category = null, options = {}) => {
   
   // Carregamento inicial
   useEffect(() => {
-    fetchMedia(true);
-  }, [profile, category, sortBy, sortDir]);
+    if (profile) {
+      fetchMedia(true);
+    }
+  }, [fetchMedia, profile, category, sortBy, sortDir]);
   
   // Carregar mais itens
   const loadMore = useCallback(() => {
@@ -124,7 +126,7 @@ export const useMedia = (category = null, options = {}) => {
       return await getMediaDetails(id);
     } catch (err) {
       console.error('Error fetching media details:', err);
-      showError('Erro ao buscar detalhes da mídia');
+      if (showError) showError('Erro ao buscar detalhes da mídia');
       return null;
     }
   }, [showError]);

@@ -3,7 +3,7 @@ import { useAuth } from './useAuth';
 import { updateWatchProgress } from '../lib/mediaStorage';
 import { useToast } from './useToast';
 
-export const usePlayer = (mediaId = null) => {
+export const usePlayer = (mediaId = null, options = {}) => {
   const [playing, setPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -105,7 +105,7 @@ export const usePlayer = (mediaId = null) => {
     setLoading(false);
     setPlaying(false);
     setBuffering(false);
-    showError(errorMessage || 'Erro ao reproduzir vídeo. Tente novamente.');
+    if (showError) showError(errorMessage || 'Erro ao reproduzir vídeo. Tente novamente.');
   }, [showError]);
 
   // Lidar com o carregamento da mídia
@@ -118,7 +118,7 @@ export const usePlayer = (mediaId = null) => {
     if (options?.autoplay) {
       setPlaying(true);
     }
-  }, []);
+  }, [options?.autoplay]);
 
   // Lidar com atualização de tempo
   const handleTimeUpdate = useCallback((time) => {

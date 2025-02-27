@@ -77,11 +77,18 @@ export const saveExternalUrl = async (url, title, description = '', category = '
 }
 
 // Função para obter lista de mídias
-export const getMediaList = async (category = null) => {
+export const getMediaList = async (category = null, options = {}) => {
+  // Opções com valores padrão
+  const limit = options.limit || 20;
+  const offset = options.offset || 0;
+  const sortBy = options.sortBy || 'created_at';
+  const sortDir = options.sortDir || 'desc';
+  
   let query = supabase
     .from('media')
     .select('*')
-    .order('created_at', { ascending: false })
+    .order(sortBy, { ascending: sortDir === 'asc' })
+    .range(offset, offset + limit - 1)
   
   if (category) {
     query = query.eq('category', category)
@@ -90,7 +97,7 @@ export const getMediaList = async (category = null) => {
   const { data, error } = await query
   
   if (error) throw error
-  return data
+  return data || []
 }
 
 // Função para obter detalhes de uma mídia específica

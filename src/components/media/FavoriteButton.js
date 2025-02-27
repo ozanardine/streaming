@@ -16,7 +16,6 @@ const FavoriteButton = ({ mediaId }) => {
       }
       
       try {
-        // Usar uma abordagem mais segura para verificar favoritos
         const { data, error } = await supabase
           .from('favorites')
           .select('id')
@@ -30,7 +29,6 @@ const FavoriteButton = ({ mediaId }) => {
           return;
         }
         
-        // Se encontrou pelo menos um registro, é favorito
         if (data && data.length > 0) {
           setIsFavorite(true);
           setFavoriteId(data[0].id);
@@ -53,7 +51,6 @@ const FavoriteButton = ({ mediaId }) => {
     
     try {
       if (isFavorite) {
-        // Se já temos o ID, usamos diretamente
         if (favoriteId) {
           const { error } = await supabase
             .from('favorites')
@@ -62,7 +59,6 @@ const FavoriteButton = ({ mediaId }) => {
             
           if (error) throw error;
         } else {
-          // Caso não tenhamos o ID (por algum motivo), usamos as chaves compostas
           const { error } = await supabase
             .from('favorites')
             .delete()
@@ -75,7 +71,6 @@ const FavoriteButton = ({ mediaId }) => {
         setIsFavorite(false);
         setFavoriteId(null);
       } else {
-        // Adicionar aos favoritos
         const { data, error } = await supabase
           .from('favorites')
           .insert([{
@@ -94,7 +89,6 @@ const FavoriteButton = ({ mediaId }) => {
       }
     } catch (err) {
       console.error('Erro ao atualizar favorito:', err);
-      // Mantém o mesmo estado para garantir consistência
     }
   }
 
